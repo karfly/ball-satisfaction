@@ -29,12 +29,12 @@ import {
 const PHYSICS_CONFIG = {
     BALL_RADIUS: 20,
     BALL_COLOR: 0xff0000,
-    BALL_RESTITUTION: 0.99,
-    BALL_FRICTION: 0.0,
+    BALL_RESTITUTION: 1.0,
+    BALL_FRICTION: 0.1,
 
     CIRCLE_WALL_COLOR: 0xffffff,
-    WALL_RESTITUTION: 0.1,
-    WALL_FRICTION: 0.0
+    WALL_RESTITUTION: 1.0,
+    WALL_FRICTION: 0.1
 } as const;
 
 // World constants
@@ -42,9 +42,10 @@ const WORLD_CONFIG = {
     WIDTH: 1024,
     HEIGHT: 768,
     CIRCLE_WALL_RADIUS: 250,
-    CIRCLE_WALL_SEGMENTS: 64,
+    CIRCLE_WALL_SEGMENTS: 512,
     BALL_START_X: 512,
-    BALL_START_Y: 768 * 0.25 // 75% down the screen
+    BALL_START_Y: 768 * 0.25, // 75% down the screen
+    GRAVITY_Y: -20 // Box2D gravity (negative for downward in Phaser coords)
 } as const;
 
 export class PhysicsSimulation extends Scene {
@@ -70,33 +71,38 @@ export class PhysicsSimulation extends Scene {
     }
 
     create() {
-        // --------------------------------------------------
-        // 1) Initialise Box2D world
-        // --------------------------------------------------
-        SetWorldScale(30); // 30px = 1 meter (works well for typical 2D games)
+        this.initPhysicsWorld();
+        this.setupDebugGraphics();
+        this.createCircleWall();
+        this.createBall();
 
+        EventBus.emit('current-scene-ready', this);
+    }
+
+    // --------------------------------------------------
+    // Helper setup methods
+    // --------------------------------------------------
+
+    private initPhysicsWorld() {
+        SetWorldScale(30);
         const worldDef = b2DefaultWorldDef();
-        // Box2D Y axis is up (+Y), Phaser is down (+Y), so we flip sign here.
-        worldDef.gravity = new b2Vec2(0, -9.8);
-
+        worldDef.gravity = new b2Vec2(0, WORLD_CONFIG.GRAVITY_Y);
         const world = CreateWorld({ worldDef });
         this.worldId = world.worldId;
+    }
 
-        // --------------------------------------------------
-        // Debug-draw setup
-        // --------------------------------------------------
+    private setupDebugGraphics() {
         this.debugGraphics = this.add.graphics();
         this.debugGraphics.setDepth(1000);
         this.debugGraphics.setVisible(this.debugEnabled);
 
         const SCALE = 30;
-
         this.debugDraw = new b2DebugDraw();
 
         const toPxX = (x: number) => x * SCALE;
         const toPxY = (y: number) => -y * SCALE;
 
-        // Basic implementations – enough to see shapes
+        // Line, circle, polygon
         this.debugDraw.DrawSegment = (p1: any, p2: any, color: number) => {
             this.debugGraphics.lineStyle(1, color & 0xffffff, 1);
             this.debugGraphics.beginPath();
@@ -117,7 +123,6 @@ export class PhysicsSimulation extends Scene {
             const rot = xf.q;
             const trans = xf.p;
             const transformPoint = (v: any) => {
-                // Rotate then translate
                 const x = rot.c * v.x - rot.s * v.y + trans.x;
                 const y = rot.s * v.x + rot.c * v.y + trans.y;
                 return { x, y };
@@ -132,19 +137,18 @@ export class PhysicsSimulation extends Scene {
             this.debugGraphics.strokePath();
         };
 
-        // Fallbacks so library doesn't throw if these are missing
+        // Fallbacks for solid drawing
         this.debugDraw.DrawSolidCircle = (xf: any, radius: number, color: number) => {
             const center = xf.p;
             this.debugDraw.DrawCircle(center, radius, color);
         };
-
         this.debugDraw.DrawSolidPolygon = (xf: any, verts: any[], count: number, color: number) => {
             this.debugDraw.DrawPolygon(xf, verts, count, color);
         };
+    }
 
-        // --------------------------------------------------
-        // 2) Render circle wall (visual) and create its physics chain shape
-        // --------------------------------------------------
+    private createCircleWall() {
+        // Visual circle wall
         this.circleWall = this.add.graphics();
         this.circleWall.lineStyle(6, PHYSICS_CONFIG.CIRCLE_WALL_COLOR);
         this.circleWall.strokeCircle(
@@ -153,26 +157,18 @@ export class PhysicsSimulation extends Scene {
             WORLD_CONFIG.CIRCLE_WALL_RADIUS
         );
 
-        // Physics circle wall body (static chain loop)
-        const circleWallBodyDef = b2DefaultBodyDef();
-        circleWallBodyDef.type = b2BodyType.b2_staticBody;
-        circleWallBodyDef.position = pxmVec2(
-            WORLD_CONFIG.WIDTH / 2,
-            -WORLD_CONFIG.HEIGHT / 2
-        );
-        const circleWallBodyId = b2CreateBody(this.worldId, circleWallBodyDef);
+        // Physics chain loop
+        const bodyDef = b2DefaultBodyDef();
+        bodyDef.type = b2BodyType.b2_staticBody;
+        bodyDef.position = pxmVec2(WORLD_CONFIG.WIDTH / 2, -WORLD_CONFIG.HEIGHT / 2);
+        const bodyId = b2CreateBody(this.worldId, bodyDef);
 
-        // Build points for chain loop
         const segments = WORLD_CONFIG.CIRCLE_WALL_SEGMENTS;
-        const radiusMeters = pxm(WORLD_CONFIG.CIRCLE_WALL_RADIUS);
+        const radiusM = pxm(WORLD_CONFIG.CIRCLE_WALL_RADIUS);
         const points: any[] = [];
         for (let i = 0; i < segments; i++) {
-            const angle = (2 * Math.PI * i) / segments;
-            // Note: push in REVERSE (clockwise) order so normals face inward
-            points.unshift(new b2Vec2(
-                radiusMeters * Math.cos(angle),
-                radiusMeters * Math.sin(angle)
-            ));
+            const a = (2 * Math.PI * i) / segments;
+            points.unshift(new b2Vec2(radiusM * Math.cos(a), radiusM * Math.sin(a)));
         }
 
         const chainDef = b2DefaultChainDef();
@@ -182,36 +178,27 @@ export class PhysicsSimulation extends Scene {
         chainDef.friction = PHYSICS_CONFIG.WALL_FRICTION;
         chainDef.restitution = PHYSICS_CONFIG.WALL_RESTITUTION;
 
-        this.circleWallBody = b2CreateChain(circleWallBodyId, chainDef);
+        this.circleWallBody = b2CreateChain(bodyId, chainDef);
+    }
 
-        // --------------------------------------------------
-        // 3) Render ball (visual)
-        // --------------------------------------------------
+    private createBall() {
+        // Visual ball
         this.ball = this.add.graphics();
         this.ball.fillStyle(PHYSICS_CONFIG.BALL_COLOR);
         this.ball.fillCircle(0, 0, PHYSICS_CONFIG.BALL_RADIUS);
         this.ball.setPosition(WORLD_CONFIG.BALL_START_X, WORLD_CONFIG.BALL_START_Y);
 
-        // Physics ball body (dynamic circle)
+        // Physics ball
         this.ballBody = CreateCircle({
             worldId: this.worldId,
             type: b2BodyType.b2_dynamicBody,
-            position: pxmVec2(
-                WORLD_CONFIG.BALL_START_X,
-                -WORLD_CONFIG.BALL_START_Y
-            ),
+            position: pxmVec2(WORLD_CONFIG.BALL_START_X, -WORLD_CONFIG.BALL_START_Y),
             radius: pxm(PHYSICS_CONFIG.BALL_RADIUS),
             restitution: PHYSICS_CONFIG.BALL_RESTITUTION,
             friction: PHYSICS_CONFIG.BALL_FRICTION
         });
 
-        // Enable continuous collision detection (bullet) to prevent tunneling through thin wall
         b2Body_SetBullet(this.ballBody.bodyId, true);
-
-        // Leave simulation paused until user starts it via UI
-
-        // Notify that scene is ready
-        EventBus.emit('current-scene-ready', this);
     }
 
     update() {

@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useRef, useState, useEffect } from 'react';
 import { IRefPhaserGame, PhaserGame } from './PhaserGame';
 import { PhysicsSimulation } from './game/scenes/PhysicsSimulation';
 
@@ -7,6 +7,7 @@ function App() {
     const [isRunning, setIsRunning] = useState(false);
     const [isPaused, setIsPaused] = useState(false);
     const [showDebug, setShowDebug] = useState(false);
+    const [fps, setFps] = useState<number>(0);
 
     const handleStartReset = () => {
         const scene = phaserRef.current?.scene as PhysicsSimulation;
@@ -54,6 +55,18 @@ function App() {
         scene?.setDebug(checked);
     };
 
+    // FPS updater
+    useEffect(() => {
+        let frameId: number;
+        const update = () => {
+            const currentFps = phaserRef.current?.game ? Math.round(phaserRef.current.game.loop.actualFps) : 0;
+            setFps(currentFps);
+            frameId = requestAnimationFrame(update);
+        };
+        frameId = requestAnimationFrame(update);
+        return () => cancelAnimationFrame(frameId);
+    }, []);
+
     return (
         <div id="app">
             <PhaserGame ref={phaserRef} currentActiveScene={onSceneReady} />
@@ -73,6 +86,7 @@ function App() {
                 <div className="info-panel">
                     <p><strong>Status:</strong> {isRunning ? (isPaused ? 'Paused' : 'Running') : 'Stopped'}</p>
                     <p>Watch the red ball bounce around the white ring!</p>
+                    <p><strong>FPS:</strong> {fps}</p>
                     <label style={{ display: 'block', marginTop: '8px' }}>
                         <input type="checkbox" checked={showDebug} onChange={handleDebugChange} />
                         {' '}Debug
