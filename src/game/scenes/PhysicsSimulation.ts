@@ -58,7 +58,7 @@ const WORLD_CONFIG = {
     HEIGHT: 768,
     CIRCLE_WALL_RADIUS: 250,
     CIRCLE_WALL_SEGMENTS: 128,
-    CIRCLE_WALL_HOLE_SIZE_DEGREES: 20,
+    CIRCLE_WALL_HOLE_SIZE_DEGREES: 45,
     CIRCLE_WALL_HOLE_POSITION_DEGREES: 90, // Top of the circle (0=right, 90=top, 180=left, 270=bottom)
     BALL_START_X: 512,
     BALL_START_Y: 768 * 0.25, // 75% down the screen
@@ -300,7 +300,7 @@ export class PhysicsSimulation extends Scene {
     }
 
     public spawnBall() {
-        const offset = (Math.random() * 2 - 1) * WORLD_CONFIG.CIRCLE_WALL_RADIUS * 0.1;
+        const offset = (Math.random() * 2 - 1) * WORLD_CONFIG.CIRCLE_WALL_RADIUS * 0.3;
         const spawnX = WORLD_CONFIG.BALL_START_X + offset;
         const spawnY = WORLD_CONFIG.BALL_START_Y;
 
