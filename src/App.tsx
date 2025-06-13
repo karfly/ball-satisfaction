@@ -6,6 +6,7 @@ function App() {
     const phaserRef = useRef<IRefPhaserGame | null>(null);
     const [isRunning, setIsRunning] = useState(false);
     const [isPaused, setIsPaused] = useState(false);
+    const [showDebug, setShowDebug] = useState(false);
 
     const handleStartReset = () => {
         const scene = phaserRef.current?.scene as PhysicsSimulation;
@@ -41,6 +42,16 @@ function App() {
         // Reset UI state when scene is ready
         setIsRunning(false);
         setIsPaused(false);
+        // ensure debug state matches checkbox
+        const scene = phaserRef.current?.scene as PhysicsSimulation;
+        scene?.setDebug(showDebug);
+    };
+
+    const handleDebugChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const checked = e.target.checked;
+        setShowDebug(checked);
+        const scene = phaserRef.current?.scene as PhysicsSimulation;
+        scene?.setDebug(checked);
     };
 
     return (
@@ -62,6 +73,10 @@ function App() {
                 <div className="info-panel">
                     <p><strong>Status:</strong> {isRunning ? (isPaused ? 'Paused' : 'Running') : 'Stopped'}</p>
                     <p>Watch the red ball bounce around the white ring!</p>
+                    <label style={{ display: 'block', marginTop: '8px' }}>
+                        <input type="checkbox" checked={showDebug} onChange={handleDebugChange} />
+                        {' '}Debug
+                    </label>
                 </div>
             </div>
         </div>
