@@ -55,8 +55,7 @@ const PHYSICS_CONFIG = {
     WALL_FRICTION: 0.0,
     WALL_THICKNESS: 15,
     CIRCLE_WALL_ROTATION_SPEED: -1.0, // radians per second (negative = clockwise)
-    BUMPER_IMPULSE: 1.5, // Ns (Newton-seconds) - a small push to keep the ball lively
-    BUMPER_PROJECTED_VELOCITY_THRESHOLD: 5.0 // m/s - apply bumper if inward velocity is below this
+    BUMP_AMPLITUDE: 3 // pixels
 } as const;
 
 // World constants
@@ -64,9 +63,9 @@ const WORLD_CONFIG = {
     WIDTH: 1024,
     HEIGHT: 768,
     CIRCLE_WALL_RADIUS: 250,
-    CIRCLE_WALL_SEGMENTS: 10,
+    CIRCLE_WALL_SEGMENTS: 128,
 
-    CIRCLE_WALL_HOLE_SIZE_DEGREES: 22.5,
+    CIRCLE_WALL_HOLE_SIZE_DEGREES: 7,
     CIRCLE_WALL_HOLE_POSITION_DEGREES: 90, // Top of the circle (0=right, 90=top, 180=left, 270=bottom)
 
     BALL_START_X: 512,
@@ -199,6 +198,8 @@ export class PhysicsSimulation extends Scene {
 
         for (let i = 0; i <= segments; i++) {
             const currentAngle = holeEndRad + i * angleStep;
+
+            // Visual point coordinates (smooth circle)
             const x = radius * Math.cos(currentAngle);
             const y = radius * Math.sin(currentAngle);
 
@@ -208,9 +209,13 @@ export class PhysicsSimulation extends Scene {
                 visualPoints.push(new Phaser.Math.Vector2(x, y));
             }
 
-            // Physics point at the inner surface
-            const px = physicsRadius * Math.cos(currentAngle);
-            const py = physicsRadius * Math.sin(currentAngle);
+            // --- Apply noise to the radius for the physics body ---
+            const noise = (Math.random() * 2 - 1) * PHYSICS_CONFIG.BUMP_AMPLITUDE;
+            const innerPhysicsRadius = physicsRadius + noise;
+
+            // Physics point at the inner surface (with noise)
+            const px = innerPhysicsRadius * Math.cos(currentAngle);
+            const py = innerPhysicsRadius * Math.sin(currentAngle);
 
             // Physics chain needs the full set, including the two end‐points.
             physicsPoints.push(new b2Vec2(pxm(px), pxm(-py)));
@@ -423,10 +428,6 @@ export class PhysicsSimulation extends Scene {
             this.circleWall.setRotation(-angle);
         }
 
-        // Apply a "bumper" impulse to balls that hit the wall
-        // currently disabled because it's not working as expected
-        // this.handleBumperCollisions();
-
         // --- Sensor processing: detect balls exiting hole ---
         const sensorEvents = b2World_GetSensorEvents(this.worldId);
         if (sensorEvents && sensorEvents.beginCount) {
@@ -495,89 +496,6 @@ export class PhysicsSimulation extends Scene {
         if (this.debugEnabled && this.debugCtx && this.debugDraw) {
             this.debugCtx.clearRect(0, 0, this.debugCanvas.width, this.debugCanvas.height);
             b2World_Draw(this.worldId, this.debugDraw);
-        }
-    }
-
-    private handleBumperCollisions() {
-        const contactEvents = b2World_GetContactEvents(this.worldId);
-        if (!contactEvents || !contactEvents.beginCount) return;
-
-        for (let i = 0; i < contactEvents.beginCount; i++) {
-            const ev = contactEvents.beginEvents[i];
-
-            const bodyA = b2Shape_GetBody(ev.shapeIdA);
-            const bodyB = b2Shape_GetBody(ev.shapeIdB);
-            const dataA = b2Body_GetUserData(bodyA);
-            const dataB = b2Body_GetUserData(bodyB);
-
-            let ballBodyId: any;
-
-            if (dataA?.type === 'ball' && dataB?.type === 'circle-wall') {
-                ballBodyId = bodyA;
-            } else if (dataB?.type === 'ball' && dataA?.type === 'circle-wall') {
-                ballBodyId = bodyB;
-            } else {
-                continue; // Not the collision we're looking for
-            }
-
-            // --- Bumper logic with projected velocity check ---
-            const wallPosition = b2Body_GetPosition(this.circleWallBodyId);
-            const ballPosition = b2Body_GetPosition(ballBodyId);
-            const ballVelocity = b2Body_GetLinearVelocity(ballBodyId);
-
-            // Calculate normalized direction vector from the ball to the wall's center
-            const directionToCenter = new b2Vec2(
-                wallPosition.x - ballPosition.x,
-                wallPosition.y - ballPosition.y
-            );
-            const length = Math.sqrt(
-                directionToCenter.x * directionToCenter.x +
-                    directionToCenter.y * directionToCenter.y
-            );
-            if (length > 1e-6) {
-                // Avoid division by zero
-                directionToCenter.x /= length;
-                directionToCenter.y /= length;
-            }
-
-            const projectedSpeed = ballVelocity.x * directionToCenter.x + ballVelocity.y * directionToCenter.y;
-
-            // Only apply impulse if the ball is moving towards the center, but not too fast.
-            if (
-                projectedSpeed <= 0 ||
-                projectedSpeed < PHYSICS_CONFIG.BUMPER_PROJECTED_VELOCITY_THRESHOLD
-            ) {
-                // Apply impulse AWAY from the center (in the opposite direction of directionToCenter)
-                const impulse = new b2Vec2(
-                    -directionToCenter.x * PHYSICS_CONFIG.BUMPER_IMPULSE,
-                    -directionToCenter.y * PHYSICS_CONFIG.BUMPER_IMPULSE
-                );
-
-                // Apply the impulse to the center of the ball
-                b2Body_ApplyLinearImpulse(ballBodyId, impulse, ballPosition, true);
-
-                console.log(
-                    `Bumper impulse applied. Projected Speed: ${projectedSpeed.toFixed(
-                        2
-                    )}. Impulse: {x: ${impulse.x.toFixed(2)}, y: ${impulse.y.toFixed(2)}}`
-                );
-            } else {
-                if (projectedSpeed <= 0) {
-                    console.log(
-                        `Bumper impulse skipped. Ball moving away from center. Projected Speed: ${projectedSpeed.toFixed(
-                            2
-                        )}`
-                    );
-                } else {
-                    console.log(
-                        `Bumper impulse skipped. Projected Speed ${projectedSpeed.toFixed(
-                            2
-                        )} >= Threshold: ${
-                            PHYSICS_CONFIG.BUMPER_PROJECTED_VELOCITY_THRESHOLD
-                        }`
-                    );
-                }
-            }
         }
     }
 
