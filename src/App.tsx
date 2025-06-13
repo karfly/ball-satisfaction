@@ -2,62 +2,48 @@ import { useRef, useState } from 'react';
 import { IRefPhaserGame, PhaserGame } from './PhaserGame';
 import { PhysicsSimulation } from './game/scenes/PhysicsSimulation';
 
-function App()
-{
-    //  References to the PhaserGame component (game and scene are exposed)
+function App() {
     const phaserRef = useRef<IRefPhaserGame | null>(null);
-    const [isSimulationRunning, setIsSimulationRunning] = useState(false);
+    const [isRunning, setIsRunning] = useState(false);
 
     const handleStartReset = () => {
-        if(phaserRef.current)
-        {
-            const scene = phaserRef.current.scene as PhysicsSimulation;
+        const scene = phaserRef.current?.scene as PhysicsSimulation;
+        if (!scene) return;
 
-            if (scene && scene.scene.key === 'PhysicsSimulation')
-            {
-                if (isSimulationRunning) {
-                    // Reset and immediately start again
-                    scene.resetSimulation();
-                    setTimeout(() => {
-                        scene.startSimulation();
-                    }, 50); // Small delay to ensure reset completes
-                } else {
-                    // Start simulation
-                    scene.startSimulation();
-                    setIsSimulationRunning(true);
-                }
-            }
+        if (isRunning) {
+            // Reset ball position and immediately restart
+            scene.resetSimulation();
+            setTimeout(() => scene.startSimulation(), 50);
+        } else {
+            // Start the physics simulation
+            scene.startSimulation();
+            setIsRunning(true);
         }
-    }
+    };
 
-    // Event emitted from the PhaserGame component
-    const currentScene = (scene: Phaser.Scene) => {
-        console.log('Scene ready:', scene.scene.key);
+    const onSceneReady = () => {
+        // Reset UI state when scene is ready
+        setIsRunning(false);
+    };
 
-        // Scene is ready, but simulation is not started yet
-        setIsSimulationRunning(false);
-    }
-
-        return (
+    return (
         <div id="app">
-            <PhaserGame ref={phaserRef} currentActiveScene={currentScene} />
-            <div>
-                <div>
-                    <button
-                        className="button"
-                        onClick={handleStartReset}
-                    >
-                        {isSimulationRunning ? 'Reset' : 'Start'}
+            <PhaserGame ref={phaserRef} currentActiveScene={onSceneReady} />
+
+            <div className="controls-panel">
+                <div className="button-container">
+                    <button className="button" onClick={handleStartReset}>
+                        {isRunning ? 'Reset' : 'Start'}
                     </button>
                 </div>
-                <div style={{ marginTop: '20px', color: '#ffffff' }}>
-                    <p>Status: {isSimulationRunning ? 'Running' : 'Stopped'}</p>
-                    <p>Watch the red ball fall and bounce in the white ring!</p>
-                    <p>Click "{isSimulationRunning ? 'Reset' : 'Start'}" to {isSimulationRunning ? 'restart the simulation' : 'begin the simulation'}.</p>
+
+                <div className="info-panel">
+                    <p><strong>Status:</strong> {isRunning ? 'Running' : 'Stopped'}</p>
+                    <p>Watch the red ball bounce around the white ring!</p>
                 </div>
             </div>
         </div>
-    )
+    );
 }
 
-export default App
+export default App;

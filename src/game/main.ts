@@ -1,8 +1,7 @@
-import { PhysicsSimulation } from './scenes/PhysicsSimulation';
 import { AUTO, Game } from 'phaser';
+import { PhysicsSimulation } from './scenes/PhysicsSimulation';
 
-//  Find out more information about the Game Config at:
-//  https://newdocs.phaser.io/docs/3.70.0/Phaser.Types.Core.GameConfig
+// Game configuration
 const config: Phaser.Types.Core.GameConfig = {
     type: AUTO,
     width: 1024,
@@ -14,18 +13,19 @@ const config: Phaser.Types.Core.GameConfig = {
         matter: {
             enableSleeping: false,
             gravity: { x: 0, y: 0.8 },
-            debug: false
+            debug: false // Set to true for physics debugging
         }
     },
-    scene: [
-        PhysicsSimulation
-    ]
+    scene: [PhysicsSimulation]
 };
 
-const StartGame = (parent: string) => {
-
+/**
+ * Initialize and start the Phaser game
+ * @param parent - The DOM element ID to attach the game to
+ * @returns The Phaser Game instance
+ */
+const StartGame = (parent: string): Game => {
     return new Game({ ...config, parent });
-
-}
+};
 
 export default StartGame;

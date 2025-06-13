@@ -1,127 +1,164 @@
 import { Scene } from 'phaser';
 import { EventBus } from '../EventBus';
 
+// Physics constants
+const PHYSICS_CONFIG = {
+    GRAVITY: 0.8,
+    BALL_RADIUS: 16,
+    BALL_RESTITUTION: 0.9,
+    BALL_FRICTION: 0.1,
+    BALL_DENSITY: 0.001,
+    RING_RADIUS: 200,
+    RING_THICKNESS: 8,
+    RING_SEGMENTS: 16,
+    RING_RESTITUTION: 0.9,
+    RING_FRICTION: 0.1
+} as const;
+
+// Game world constants
+const WORLD_CONFIG = {
+    WIDTH: 1024,
+    HEIGHT: 768,
+    CENTER_X: 512,
+    CENTER_Y: 384,
+    BALL_START_Y: 200
+} as const;
+
+// Colors
+const COLORS = {
+    BALL: 0xff0000,
+    RING: 0xffffff
+} as const;
+
 export class PhysicsSimulation extends Scene {
-    private world: any;
-    private ball: Phaser.GameObjects.Graphics;
-    private ring: Phaser.GameObjects.Graphics;
-    private isSimulationRunning: boolean = false;
-    private ballBody: any;
-    private ringBodies: any[] = [];
+    private ball!: Phaser.GameObjects.Graphics;
+    private ring!: Phaser.GameObjects.Graphics;
+    private ballBody!: MatterJS.BodyType;
+    private isRunning: boolean = false;
 
     constructor() {
         super('PhysicsSimulation');
     }
 
-        create() {
-        // Initialize physics and create game objects immediately
+    create() {
         this.initializePhysics();
-        this.createRing();
-        this.createBall();
+        this.createVisuals();
+        this.createPhysicsBodies();
 
-        // Emit scene ready event
+        // Notify that scene is ready
         EventBus.emit('current-scene-ready', this);
     }
 
     private initializePhysics() {
-        // For now, we'll use Phaser's built-in Matter.js physics for a working demo
-        // and we can upgrade to Box2D later once the plugin is properly loaded
-        this.matter.world.setBounds(0, 0, 1024, 768, 32, true, true, false, true);
-        this.matter.world.engine.world.gravity.y = 0.8;
+        // Set up Matter.js physics world
+        this.matter.world.setBounds(
+            0, 0,
+            WORLD_CONFIG.WIDTH,
+            WORLD_CONFIG.HEIGHT,
+            32,
+            true, true, false, true
+        );
+        this.matter.world.engine.world.gravity.y = PHYSICS_CONFIG.GRAVITY;
     }
 
-        private createRing() {
-        // Create visual ring
+    private createVisuals() {
+        this.createRingVisual();
+        this.createBallVisual();
+    }
+
+    private createRingVisual() {
         this.ring = this.add.graphics();
-        this.ring.lineStyle(8, 0xffffff);
-        this.ring.strokeCircle(512, 384, 200);
-
-        // Create physics bodies for the ring using Matter.js
-        this.createRingPhysics();
+        this.ring.lineStyle(PHYSICS_CONFIG.RING_THICKNESS, COLORS.RING);
+        this.ring.strokeCircle(
+            WORLD_CONFIG.CENTER_X,
+            WORLD_CONFIG.CENTER_Y,
+            PHYSICS_CONFIG.RING_RADIUS
+        );
     }
 
-    private createRingPhysics() {
-        const centerX = 512;
-        const centerY = 384;
-        const radius = 200;
-        const segments = 16; // Fewer segments for better performance
-
-        for (let i = 0; i < segments; i++) {
-            const angle1 = (i / segments) * Math.PI * 2;
-            const angle2 = ((i + 1) / segments) * Math.PI * 2;
-
-            const x1 = centerX + Math.cos(angle1) * radius;
-            const y1 = centerY + Math.sin(angle1) * radius;
-            const x2 = centerX + Math.cos(angle2) * radius;
-            const y2 = centerY + Math.sin(angle2) * radius;
-
-            // Create line segment for the ring
-            const midX = (x1 + x2) / 2;
-            const midY = (y1 + y2) / 2;
-            const width = Math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2);
-            const angle = Math.atan2(y2 - y1, x2 - x1);
-
-            const segment = this.matter.add.rectangle(midX, midY, width, 8, {
-                isStatic: true,
-                angle: angle,
-                render: { visible: false },
-                restitution: 0.9, // High bounce
-                friction: 0.1
-            });
-
-            this.ringBodies.push(segment);
-        }
-    }
-
-    private createBall() {
-        // Create visual ball
+    private createBallVisual() {
         this.ball = this.add.graphics();
-        this.ball.fillStyle(0xff0000);
-        this.ball.fillCircle(0, 0, 16);
-        this.ball.x = 512;
-        this.ball.y = 200; // Start above center
+        this.ball.fillStyle(COLORS.BALL);
+        this.ball.fillCircle(0, 0, PHYSICS_CONFIG.BALL_RADIUS);
+        this.ball.x = WORLD_CONFIG.CENTER_X;
+        this.ball.y = WORLD_CONFIG.BALL_START_Y;
+    }
 
-        // Create physics body for the ball
+    private createPhysicsBodies() {
+        this.createRingPhysics();
         this.createBallPhysics();
     }
 
+    private createRingPhysics() {
+        const { CENTER_X, CENTER_Y } = WORLD_CONFIG;
+        const { RING_RADIUS, RING_SEGMENTS, RING_THICKNESS, RING_RESTITUTION, RING_FRICTION } = PHYSICS_CONFIG;
+
+        // Create ring as multiple static line segments
+        for (let i = 0; i < RING_SEGMENTS; i++) {
+            const angle1 = (i / RING_SEGMENTS) * Math.PI * 2;
+            const angle2 = ((i + 1) / RING_SEGMENTS) * Math.PI * 2;
+
+            const x1 = CENTER_X + Math.cos(angle1) * RING_RADIUS;
+            const y1 = CENTER_Y + Math.sin(angle1) * RING_RADIUS;
+            const x2 = CENTER_X + Math.cos(angle2) * RING_RADIUS;
+            const y2 = CENTER_Y + Math.sin(angle2) * RING_RADIUS;
+
+            const midX = (x1 + x2) / 2;
+            const midY = (y1 + y2) / 2;
+            const segmentLength = Math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2);
+            const segmentAngle = Math.atan2(y2 - y1, x2 - x1);
+
+            this.matter.add.rectangle(midX, midY, segmentLength, RING_THICKNESS, {
+                isStatic: true,
+                angle: segmentAngle,
+                render: { visible: false },
+                restitution: RING_RESTITUTION,
+                friction: RING_FRICTION
+            });
+        }
+    }
+
     private createBallPhysics() {
-        // Create physics body
-        this.ballBody = this.matter.add.circle(512, 200, 16, {
-            restitution: 0.9, // Very bouncy
-            friction: 0.1,
-            density: 0.001,
+        const { CENTER_X, BALL_START_Y } = WORLD_CONFIG;
+        const { BALL_RADIUS, BALL_RESTITUTION, BALL_FRICTION, BALL_DENSITY } = PHYSICS_CONFIG;
+
+        this.ballBody = this.matter.add.circle(CENTER_X, BALL_START_Y, BALL_RADIUS, {
+            restitution: BALL_RESTITUTION,
+            friction: BALL_FRICTION,
+            density: BALL_DENSITY,
             render: { visible: false }
         });
 
-        // Initially make the ball static (not affected by gravity)
+        // Start with ball static (not affected by gravity)
         this.matter.body.setStatic(this.ballBody, true);
     }
 
     public startSimulation() {
-        if (!this.isSimulationRunning) {
-            this.isSimulationRunning = true;
-
-            // Make the ball dynamic so it's affected by gravity
+        if (!this.isRunning) {
+            this.isRunning = true;
+            // Enable physics on the ball
             this.matter.body.setStatic(this.ballBody, false);
         }
     }
 
     public resetSimulation() {
         if (this.ballBody) {
-            // Reset ball position and make it static again
+            // Stop the ball and reset its position
             this.matter.body.setStatic(this.ballBody, true);
-            this.matter.body.setPosition(this.ballBody, { x: 512, y: 200 });
+            this.matter.body.setPosition(this.ballBody, {
+                x: WORLD_CONFIG.CENTER_X,
+                y: WORLD_CONFIG.BALL_START_Y
+            });
             this.matter.body.setVelocity(this.ballBody, { x: 0, y: 0 });
             this.matter.body.setAngularVelocity(this.ballBody, 0);
 
-            this.isSimulationRunning = false;
+            this.isRunning = false;
         }
     }
 
     update() {
-        if (this.ballBody) {
-            // Update visual ball position from physics body
+        // Sync visual ball with physics body
+        if (this.ballBody && this.ball) {
             this.ball.x = this.ballBody.position.x;
             this.ball.y = this.ballBody.position.y;
             this.ball.rotation = this.ballBody.angle;
