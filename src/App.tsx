@@ -5,6 +5,7 @@ import { PhysicsSimulation } from './game/scenes/PhysicsSimulation';
 function App() {
     const phaserRef = useRef<IRefPhaserGame | null>(null);
     const [isRunning, setIsRunning] = useState(false);
+    const [isPaused, setIsPaused] = useState(false);
 
     const handleStartReset = () => {
         const scene = phaserRef.current?.scene as PhysicsSimulation;
@@ -14,16 +15,32 @@ function App() {
             // Reset ball position and immediately restart
             scene.resetSimulation();
             setTimeout(() => scene.startSimulation(), 50);
+            setIsPaused(false);
         } else {
             // Start the physics simulation
             scene.startSimulation();
             setIsRunning(true);
+            setIsPaused(false);
+        }
+    };
+
+    const handlePauseToggle = () => {
+        const scene = phaserRef.current?.scene as PhysicsSimulation;
+        if (!scene || !isRunning) return; // can't pause if not running
+
+        if (isPaused) {
+            scene.resumeSimulation();
+            setIsPaused(false);
+        } else {
+            scene.pauseSimulation();
+            setIsPaused(true);
         }
     };
 
     const onSceneReady = () => {
         // Reset UI state when scene is ready
         setIsRunning(false);
+        setIsPaused(false);
     };
 
     return (
@@ -33,12 +50,17 @@ function App() {
             <div className="controls-panel">
                 <div className="button-container">
                     <button className="button" onClick={handleStartReset}>
-                        {isRunning ? 'Reset' : 'Start'}
+                        {isRunning ? 'Start Again' : 'Start'}
                     </button>
+                    {isRunning && (
+                        <button className="button" onClick={handlePauseToggle} style={{ marginLeft: '8px' }}>
+                            {isPaused ? 'Resume' : 'Pause'}
+                        </button>
+                    )}
                 </div>
 
                 <div className="info-panel">
-                    <p><strong>Status:</strong> {isRunning ? 'Running' : 'Stopped'}</p>
+                    <p><strong>Status:</strong> {isRunning ? (isPaused ? 'Paused' : 'Running') : 'Stopped'}</p>
                     <p>Watch the red ball bounce around the white ring!</p>
                 </div>
             </div>

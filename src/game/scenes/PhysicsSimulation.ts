@@ -46,6 +46,9 @@ export class PhysicsSimulation extends Scene {
     // Box2D world identifier
     private worldId: any;
 
+    // Simulation state
+    private isPaused: boolean = true;
+
     constructor() {
         super('PhysicsSimulation');
     }
@@ -106,8 +109,7 @@ export class PhysicsSimulation extends Scene {
             restitution: PHYSICS_CONFIG.BOUNCE
         });
 
-        // Start the simulation immediately
-        this.startSimulation();
+        // Leave simulation paused until user starts it via UI
 
         // Notify that scene is ready
         EventBus.emit('current-scene-ready', this);
@@ -116,9 +118,11 @@ export class PhysicsSimulation extends Scene {
     update() {
         if (!this.worldId) return;
 
-        // Step physics simulation (convert delta from ms to s)
-        const dt = this.game.loop.delta / 1000;
-        WorldStep({ worldId: this.worldId, deltaTime: dt });
+        // Step physics simulation only when not paused
+        if (!this.isPaused) {
+            const dt = this.game.loop.delta / 1000;
+            WorldStep({ worldId: this.worldId, deltaTime: dt });
+        }
 
         // Sync visual ball with physics body
         if (this.ballBody && this.ball) {
@@ -128,7 +132,18 @@ export class PhysicsSimulation extends Scene {
 
     public startSimulation() {
         // Nothing special to do – gravity already active
+        this.isPaused = false;
         console.log('Ball falling simulation started');
+    }
+
+    public pauseSimulation() {
+        this.isPaused = true;
+        console.log('Simulation paused');
+    }
+
+    public resumeSimulation() {
+        this.isPaused = false;
+        console.log('Simulation resumed');
     }
 
     public resetSimulation() {
@@ -145,6 +160,9 @@ export class PhysicsSimulation extends Scene {
 
         // Visually sync immediately
         BodyToSprite(this.ballBody, this.ball);
+
+        // Keep simulation paused after reset until explicitly started
+        this.isPaused = true;
 
         console.log('Simulation reset');
     }
