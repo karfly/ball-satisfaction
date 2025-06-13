@@ -7,6 +7,7 @@ import {
     CreateWorld,
     WorldStep,
     CreateCircle,
+    CreateCapsule,
     pxm,
     pxmVec2,
     BodyToSprite,
@@ -34,11 +35,12 @@ const PHYSICS_CONFIG = {
     BALL_RADIUS: 10,
     BALL_COLOR: 0xff0000,
     BALL_RESTITUTION: 1.0,
-    BALL_FRICTION: 0.5,
+    BALL_FRICTION: 0.0,
 
     CIRCLE_WALL_COLOR: 0xffffff,
     WALL_RESTITUTION: 1.0,
-    WALL_FRICTION: 0.5,
+    WALL_FRICTION: 0.0,
+    WALL_THICKNESS: 15,
     CIRCLE_WALL_ROTATION_SPEED: -1.0 // radians per second (negative = clockwise)
 } as const;
 
@@ -48,7 +50,7 @@ const WORLD_CONFIG = {
     HEIGHT: 768,
     CIRCLE_WALL_RADIUS: 250,
     CIRCLE_WALL_SEGMENTS: 128,
-    CIRCLE_WALL_HOLE_SIZE_DEGREES: 45,
+    CIRCLE_WALL_HOLE_SIZE_DEGREES: 20,
     CIRCLE_WALL_HOLE_POSITION_DEGREES: 90, // Top of the circle (0=right, 90=top, 180=left, 270=bottom)
     BALL_START_X: 512,
     BALL_START_Y: 768 * 0.25, // 75% down the screen
@@ -158,9 +160,11 @@ export class PhysicsSimulation extends Scene {
         const segments = WORLD_CONFIG.CIRCLE_WALL_SEGMENTS;
         const radius = WORLD_CONFIG.CIRCLE_WALL_RADIUS;
 
-        // The solid wall occupies the arc that is NOT the hole.
-        // Start from the end of the hole and walk around the circle until we reach the
-        // beginning of the hole.
+        // For the physics chain we want to align with the INNER edge of the visual wall.
+        // The visual line is drawn centred on `radius` with a thickness, so its inner edge
+        // is `radius - WALL_THICKNESS / 2`.
+        const physicsRadius = radius - PHYSICS_CONFIG.WALL_THICKNESS / 2;
+
         const wallArcRad = 2 * Math.PI - holeSizeRad; // total radians for the wall
         const angleStep = wallArcRad / segments;      // uniform step size
 
@@ -178,13 +182,17 @@ export class PhysicsSimulation extends Scene {
                 visualPoints.push(new Phaser.Math.Vector2(x, y));
             }
 
+            // Physics point at the inner surface
+            const px = physicsRadius * Math.cos(currentAngle);
+            const py = physicsRadius * Math.sin(currentAngle);
+
             // Physics chain needs the full set, including the two end‐points.
-            physicsPoints.push(new b2Vec2(pxm(x), pxm(-y)));
+            physicsPoints.push(new b2Vec2(pxm(px), pxm(-py)));
         }
 
         // --- 3. CREATE VISUAL WALL ---
         this.circleWall = this.add.graphics();
-        this.circleWall.lineStyle(6, PHYSICS_CONFIG.CIRCLE_WALL_COLOR, 1);
+        this.circleWall.lineStyle(PHYSICS_CONFIG.WALL_THICKNESS, PHYSICS_CONFIG.CIRCLE_WALL_COLOR, 1);
         this.circleWall.strokePoints(visualPoints); // Draw the arc using the generated points
         this.circleWall.setPosition(WORLD_CONFIG.WIDTH / 2, WORLD_CONFIG.HEIGHT / 2);
 
@@ -209,6 +217,42 @@ export class PhysicsSimulation extends Scene {
         // --- 5. SET ROTATION ---
         // Set angular velocity for clockwise rotation, same as before
         b2Body_SetAngularVelocity(bodyId, PHYSICS_CONFIG.CIRCLE_WALL_ROTATION_SPEED);
+
+        // --- 6. ADD CAPSULES AT HOLE CORNERS ---
+        const thickness = PHYSICS_CONFIG.WALL_THICKNESS;
+        const capRadius = thickness / 2;
+
+        // Helper to build a capsule that extends the visual stroke tangentially
+        const makeEdgeCapsule = (edge: Phaser.Math.Vector2, tangent: Phaser.Math.Vector2) => {
+            const halfLen = thickness / 2;
+            const tDir = tangent.clone().normalize();
+
+            const p1 = edge.clone().subtract(tDir.clone().scale(halfLen));
+            const p2 = edge.clone().add(tDir.clone().scale(halfLen));
+
+            CreateCapsule({
+                worldId: this.worldId,
+                bodyId: bodyId, // attach to rotating wall
+                center1: new b2Vec2(pxm(p1.x), pxm(-p1.y)),
+                center2: new b2Vec2(pxm(p2.x), pxm(-p2.y)),
+                radius: pxm(capRadius),
+                friction: PHYSICS_CONFIG.WALL_FRICTION,
+                restitution: PHYSICS_CONFIG.WALL_RESTITUTION
+            });
+        };
+
+        // Build tangent capsules using the visual arc points
+        if (visualPoints.length >= 2) {
+            // Left hole edge (array start)
+            const leftEdge = visualPoints[1];
+            const leftNext = visualPoints[2];
+            makeEdgeCapsule(leftEdge, leftNext.clone().subtract(leftEdge));
+
+            // Right hole edge (array end)
+            const rightEdge = visualPoints[visualPoints.length - 2];
+            const rightPrev = visualPoints[visualPoints.length - 3];
+            makeEdgeCapsule(rightEdge, rightPrev.clone().subtract(rightEdge));
+        }
     }
 
     public spawnBall() {
