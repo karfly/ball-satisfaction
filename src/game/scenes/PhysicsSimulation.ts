@@ -48,6 +48,8 @@ const WORLD_CONFIG = {
     HEIGHT: 768,
     CIRCLE_WALL_RADIUS: 250,
     CIRCLE_WALL_SEGMENTS: 32,
+    CIRCLE_WALL_HOLE_SIZE_DEGREES: 45,
+    CIRCLE_WALL_HOLE_POSITION_DEGREES: 90, // Top of the circle (0=right, 90=top, 180=left, 270=bottom)
     BALL_START_X: 512,
     BALL_START_Y: 768 * 0.25, // 75% down the screen
     GRAVITY_Y: -20 // Box2D gravity (negative for downward in Phaser coords)
@@ -136,39 +138,66 @@ export class PhysicsSimulation extends Scene {
     }
 
     private createCircleWall() {
-        // Visual circle wall
-        this.circleWall = this.add.graphics();
-        this.circleWall.lineStyle(6, PHYSICS_CONFIG.CIRCLE_WALL_COLOR);
-        this.circleWall.strokeCircle(0, 0, WORLD_CONFIG.CIRCLE_WALL_RADIUS);
+        // --- 1. HOLE GEOMETRY CALCULATION ---
+        // Convert hole properties from degrees to radians for calculations
+        const holePositionRad = (WORLD_CONFIG.CIRCLE_WALL_HOLE_POSITION_DEGREES * Math.PI) / 180;
+        const holeSizeRad = (WORLD_CONFIG.CIRCLE_WALL_HOLE_SIZE_DEGREES * Math.PI) / 180;
 
-        // Position the graphics object at the center of the screen
+        // The hole starts and ends on either side of its center position
+        const holeStartRad = holePositionRad - holeSizeRad / 2;
+        const holeEndRad = holePositionRad + holeSizeRad / 2;
+
+        // --- 2. GENERATE POINTS FOR THE WALL ARC (SKIPPING THE HOLE) ---
+        const segments = WORLD_CONFIG.CIRCLE_WALL_SEGMENTS;
+        const radius = WORLD_CONFIG.CIRCLE_WALL_RADIUS;
+
+        // We generate points for the wall section by starting at the end of the hole,
+        // wrapping all the way around, and stopping at the beginning of the hole.
+        const wallStartRad = holeEndRad;
+        const wallEndRad = wallStartRad + 2 * Math.PI; // Add 2*PI to loop around
+
+        const visualPoints: Phaser.Math.Vector2[] = [];
+        const physicsPoints: any[] = []; // Array for b2Vec2 points
+
+        const angleStep = (wallEndRad - wallStartRad) / segments;
+
+        for (let i = 0; i < segments; i++) { // NOTE: '< segments' to avoid duplicate first/last point
+            const currentAngle = wallStartRad + i * angleStep;
+            const x = radius * Math.cos(currentAngle);
+            const y = radius * Math.sin(currentAngle);
+
+            // Create points for visual rendering (pixels)
+            visualPoints.push(new Phaser.Math.Vector2(x, y));
+            // Physics points will be reversed later to ensure clockwise order (normals pointing inward)
+            physicsPoints.push(new b2Vec2(pxm(x), pxm(-y)));
+        }
+
+        // --- 3. CREATE VISUAL WALL ---
+        this.circleWall = this.add.graphics();
+        this.circleWall.lineStyle(6, PHYSICS_CONFIG.CIRCLE_WALL_COLOR, 1);
+        this.circleWall.strokePoints(visualPoints); // Draw the arc using the generated points
         this.circleWall.setPosition(WORLD_CONFIG.WIDTH / 2, WORLD_CONFIG.HEIGHT / 2);
 
-        // Physics chain loop
+        // --- 4. CREATE PHYSICS BODY ---
         const bodyDef = b2DefaultBodyDef();
         bodyDef.type = b2BodyType.b2_kinematicBody;
+        // Remember Box2D's Y-axis is inverted from Phaser's, so we negate the y-position
         bodyDef.position = pxmVec2(WORLD_CONFIG.WIDTH / 2, -WORLD_CONFIG.HEIGHT / 2);
         const bodyId = b2CreateBody(this.worldId, bodyDef);
         this.circleWallBodyId = bodyId;
 
-        const segments = WORLD_CONFIG.CIRCLE_WALL_SEGMENTS;
-        const radiusM = pxm(WORLD_CONFIG.CIRCLE_WALL_RADIUS);
-        const points: any[] = [];
-        for (let i = 0; i < segments; i++) {
-            const a = (2 * Math.PI * i) / segments;
-            points.unshift(new b2Vec2(radiusM * Math.cos(a), radiusM * Math.sin(a)));
-        }
-
         const chainDef = b2DefaultChainDef();
-        chainDef.points = points;
-        chainDef.count = points.length;
-        chainDef.isLoop = true;
+        // No reversal needed because after Y inversion the points are already clockwise, giving inward-facing normals
+        chainDef.points = physicsPoints;
+        chainDef.count = physicsPoints.length;
+        chainDef.isLoop = false; // This is now an open chain, not a closed loop
         chainDef.friction = PHYSICS_CONFIG.WALL_FRICTION;
         chainDef.restitution = PHYSICS_CONFIG.WALL_RESTITUTION;
 
         this.circleWallBody = b2CreateChain(bodyId, chainDef);
 
-        // Set angular velocity for clockwise rotation
+        // --- 5. SET ROTATION ---
+        // Set angular velocity for clockwise rotation, same as before
         b2Body_SetAngularVelocity(bodyId, PHYSICS_CONFIG.CIRCLE_WALL_ROTATION_SPEED);
     }
 
@@ -220,7 +249,9 @@ export class PhysicsSimulation extends Scene {
 
             const rotation = b2Body_GetRotation(this.circleWallBodyId);
             const angle = b2Rot_GetAngle(rotation);
-            this.circleWall.setRotation(angle);
+            // Phaser's positive rotation is clockwise, whereas Box2D's positive rotation is counter-clockwise.
+            // Negate the angle so the visual matches the physics body's orientation.
+            this.circleWall.setRotation(-angle);
         }
 
         // Debug rendering
