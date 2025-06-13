@@ -44,10 +44,11 @@ const PHYSICS_CONFIG = {
     BALL_COLOR: 0xff0000,
     BALL_RESTITUTION: 1.0,
     BALL_FRICTION: 0.1,
+    BALL_INITIAL_VELOCITY_Y: -10, // A negative value for downward velocity in Box2D
 
     CIRCLE_WALL_COLOR: 0xffffff,
     WALL_RESTITUTION: 1.0,
-    WALL_FRICTION: 0.1,
+    WALL_FRICTION: 0.0,
     WALL_THICKNESS: 15,
     CIRCLE_WALL_ROTATION_SPEED: -1.0 // radians per second (negative = clockwise)
 } as const;
@@ -57,11 +58,13 @@ const WORLD_CONFIG = {
     WIDTH: 1024,
     HEIGHT: 768,
     CIRCLE_WALL_RADIUS: 250,
-    CIRCLE_WALL_SEGMENTS: 128,
-    CIRCLE_WALL_HOLE_SIZE_DEGREES: 45,
+    CIRCLE_WALL_SEGMENTS: 512,
+
+    CIRCLE_WALL_HOLE_SIZE_DEGREES: 22.5,
     CIRCLE_WALL_HOLE_POSITION_DEGREES: 90, // Top of the circle (0=right, 90=top, 180=left, 270=bottom)
+
     BALL_START_X: 512,
-    BALL_START_Y: 768 * (0.25), // 75% down the screen
+    BALL_START_Y: 768 * (0.5), // 75% down the screen
     GRAVITY_Y: -20 // Box2D gravity (negative for downward in Phaser coords)
 } as const;
 
@@ -347,7 +350,7 @@ export class PhysicsSimulation extends Scene {
     }
 
     public spawnBall() {
-        const offset = (Math.random() * 2 - 1) * WORLD_CONFIG.CIRCLE_WALL_RADIUS * 0.3;
+        const offset = (Math.random() * 2 - 1) * WORLD_CONFIG.CIRCLE_WALL_RADIUS * 0.1;
         const spawnX = WORLD_CONFIG.BALL_START_X + offset;
         const spawnY = WORLD_CONFIG.BALL_START_Y;
 
@@ -366,7 +369,11 @@ export class PhysicsSimulation extends Scene {
             restitution: PHYSICS_CONFIG.BALL_RESTITUTION,
             friction: PHYSICS_CONFIG.BALL_FRICTION
         });
-        // b2Body_SetBullet(body.bodyId, true);
+        b2Body_SetBullet(body.bodyId, true);
+        b2Body_SetLinearVelocity(
+            body.bodyId,
+            new b2Vec2(0, PHYSICS_CONFIG.BALL_INITIAL_VELOCITY_Y)
+        );
 
         // Tag body so we can recognise it later
         b2Body_SetUserData(body.bodyId, { type: 'ball' });
