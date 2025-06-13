@@ -43,11 +43,11 @@ const PHYSICS_CONFIG = {
     BALL_RADIUS: 10,
     BALL_COLOR: 0xff0000,
     BALL_RESTITUTION: 1.0,
-    BALL_FRICTION: 0.0,
+    BALL_FRICTION: 0.1,
 
     CIRCLE_WALL_COLOR: 0xffffff,
     WALL_RESTITUTION: 1.0,
-    WALL_FRICTION: 0.0,
+    WALL_FRICTION: 0.1,
     WALL_THICKNESS: 15,
     CIRCLE_WALL_ROTATION_SPEED: -1.0 // radians per second (negative = clockwise)
 } as const;
@@ -61,7 +61,7 @@ const WORLD_CONFIG = {
     CIRCLE_WALL_HOLE_SIZE_DEGREES: 45,
     CIRCLE_WALL_HOLE_POSITION_DEGREES: 90, // Top of the circle (0=right, 90=top, 180=left, 270=bottom)
     BALL_START_X: 512,
-    BALL_START_Y: 768 * 0.25, // 75% down the screen
+    BALL_START_Y: 768 * (0.25), // 75% down the screen
     GRAVITY_Y: -20 // Box2D gravity (negative for downward in Phaser coords)
 } as const;
 
