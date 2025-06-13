@@ -72,6 +72,10 @@ const WORLD_STEP_CONFIG = {
     SUB_STEPS: 8            // default was 4 – doubling gives better CCD
 } as const;
 
+const KILL_BOUNDARY_CONFIG = {
+    BUFFER: 100 // pixels
+} as const;
+
 export class PhysicsSimulation extends Scene {
     private circleWall!: Phaser.GameObjects.Graphics;
     private circleWallBody: any;
@@ -107,6 +111,7 @@ export class PhysicsSimulation extends Scene {
         this.initPhysicsWorld();
         this.setupDebugCanvas();
         this.createCircleWall();
+        this.createKillBoundaries();
         this.spawnBall();
 
         // Apply initial visual state
@@ -299,6 +304,48 @@ export class PhysicsSimulation extends Scene {
         b2Shape_EnableSensorEvents(this.holeSensorShapeId, true);
     }
 
+    private createKillBoundaries() {
+        const { WIDTH, HEIGHT } = WORLD_CONFIG;
+        const { BUFFER } = KILL_BOUNDARY_CONFIG;
+
+        const halfW = pxm(WIDTH / 2);
+        const halfH = pxm(HEIGHT / 2);
+        const halfBuff = pxm(BUFFER / 2);
+
+        // A single static body will hold all four sensor shapes
+        const boundaryBodyDef = b2DefaultBodyDef();
+        const boundaryBodyId = b2CreateBody(this.worldId, boundaryBodyDef);
+
+        const shapeDef = b2DefaultShapeDef();
+        shapeDef.isSensor = true;
+        b2Body_SetUserData(boundaryBodyId, { type: 'kill-boundary' });
+
+        // Helper to create and attach a sensor box
+        const createSensor = (
+            width: number,
+            height: number,
+            center: { x: number; y: number }
+        ) => {
+            const sensorBox = b2MakeOffsetBox(
+                width,
+                height,
+                new b2Vec2(center.x, center.y),
+                0
+            );
+            const shapeId = b2CreatePolygonShape(boundaryBodyId, shapeDef, sensorBox);
+            b2Shape_EnableSensorEvents(shapeId, true);
+        };
+
+        // Top boundary sensor
+        createSensor(halfW + halfBuff, halfBuff, { x: halfW, y: halfBuff });
+        // Bottom boundary sensor
+        createSensor(halfW + halfBuff, halfBuff, { x: halfW, y: -halfH * 2 - halfBuff });
+        // Left boundary sensor
+        createSensor(halfBuff, halfH + halfBuff, { x: -halfBuff, y: -halfH });
+        // Right boundary sensor
+        createSensor(halfBuff, halfH + halfBuff, { x: halfW * 2 + halfBuff, y: -halfH });
+    }
+
     public spawnBall() {
         const offset = (Math.random() * 2 - 1) * WORLD_CONFIG.CIRCLE_WALL_RADIUS * 0.3;
         const spawnX = WORLD_CONFIG.BALL_START_X + offset;
@@ -322,7 +369,7 @@ export class PhysicsSimulation extends Scene {
         // b2Body_SetBullet(body.bodyId, true);
 
         // Tag body so we can recognise it later
-        b2Body_SetUserData(body.bodyId, 'ball');
+        b2Body_SetUserData(body.bodyId, { type: 'ball' });
 
         // Store
         this.balls.push(ballGraphic);
@@ -375,7 +422,7 @@ export class PhysicsSimulation extends Scene {
                     const visitorUserData = b2Body_GetUserData(visitorBodyId);
 
                     if (
-                        visitorUserData === 'ball' &&
+                        visitorUserData?.type === 'ball' &&
                         !this.triggeredBallBodies.has(visitorBodyId.index1)
                     ) {
                         this.triggeredBallBodies.add(visitorBodyId.index1);
@@ -385,6 +432,43 @@ export class PhysicsSimulation extends Scene {
                     }
                 }
             }
+        }
+
+        const bodiesToDestroy = new Set<number>();
+
+        // Process sensor end events for kill boundaries
+        if (sensorEvents && sensorEvents.endCount) {
+            for (let i = 0; i < sensorEvents.endCount; i++) {
+                const ev = sensorEvents.endEvents[i];
+                const sensorBody = b2Shape_GetBody(ev.sensorShapeId);
+                const visitorBody = b2Shape_GetBody(ev.visitorShapeId);
+                const sensorData = b2Body_GetUserData(sensorBody);
+                const visitorData = b2Body_GetUserData(visitorBody);
+
+                // Check if a ball has left a kill boundary
+                if (sensorData?.type === 'kill-boundary' && visitorData?.type === 'ball') {
+                    bodiesToDestroy.add(visitorBody.index1);
+                } else if (
+                    visitorData?.type === 'kill-boundary' &&
+                    sensorData?.type === 'ball'
+                ) {
+                    bodiesToDestroy.add(sensorBody.index1);
+                }
+            }
+        }
+
+        // Safely destroy bodies after the simulation step
+        if (bodiesToDestroy.size > 0) {
+            this.ballBodies = this.ballBodies.filter((body, i) => {
+                if (bodiesToDestroy.has(body.bodyId.index1)) {
+                    b2DestroyBody(body.bodyId);
+                    this.balls[i].destroy();
+                    this.triggeredBallBodies.delete(body.bodyId.index1);
+                    return false; // Remove from arrays
+                }
+                return true;
+            });
+            this.balls = this.balls.filter((g) => g.active);
         }
 
         // Debug rendering
