@@ -31,7 +31,7 @@ import {
 
 // Simple physics constants
 const PHYSICS_CONFIG = {
-    BALL_RADIUS: 20,
+    BALL_RADIUS: 10,
     BALL_COLOR: 0xff0000,
     BALL_RESTITUTION: 1.0,
     BALL_FRICTION: 0.5,
@@ -53,6 +53,13 @@ const WORLD_CONFIG = {
     BALL_START_X: 512,
     BALL_START_Y: 768 * 0.25, // 75% down the screen
     GRAVITY_Y: -20 // Box2D gravity (negative for downward in Phaser coords)
+} as const;
+
+// Fine-tuning for the physics solver. Increasing the number of sub-steps helps
+// prevent small/fast bodies from tunnelling through thin geometry.
+const WORLD_STEP_CONFIG = {
+    FIXED_TIME_STEP: 1 / 60, // seconds
+    SUB_STEPS: 8            // default was 4 – doubling gives better CCD
 } as const;
 
 export class PhysicsSimulation extends Scene {
@@ -237,7 +244,12 @@ export class PhysicsSimulation extends Scene {
         // Step physics simulation only when not paused
         if (!this.isPaused) {
             const dt = this.game.loop.delta / 1000;
-            WorldStep({ worldId: this.worldId, deltaTime: dt });
+            WorldStep({
+                worldId: this.worldId,
+                deltaTime: dt,
+                fixedTimeStep: WORLD_STEP_CONFIG.FIXED_TIME_STEP,
+                subStepCount: WORLD_STEP_CONFIG.SUB_STEPS
+            });
         }
 
         // Sync all balls
