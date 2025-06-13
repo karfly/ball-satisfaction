@@ -8,14 +8,7 @@ const config: Phaser.Types.Core.GameConfig = {
     height: 768,
     parent: 'game-container',
     backgroundColor: '#1a1a2e',
-    physics: {
-        default: 'matter',
-        matter: {
-            enableSleeping: false,
-            gravity: { x: 0, y: 0.8 },
-            debug: false // Set to true for physics debugging
-        }
-    },
+    // No built-in physics engine required (Box2D world is managed manually inside scenes)
     scene: [PhysicsSimulation]
 };
 
