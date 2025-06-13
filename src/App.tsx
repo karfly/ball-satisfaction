@@ -6,7 +6,8 @@ function App() {
     const phaserRef = useRef<IRefPhaserGame | null>(null);
     const [isRunning, setIsRunning] = useState(false);
     const [isPaused, setIsPaused] = useState(false);
-    const [showDebug, setShowDebug] = useState(false);
+    const [showDebug, setShowDebug] = useState(true);
+    const [showVisuals, setShowVisuals] = useState(true);
     const [fps, setFps] = useState<number>(0);
 
     const handleStartReset = () => {
@@ -43,9 +44,10 @@ function App() {
         // Reset UI state when scene is ready
         setIsRunning(false);
         setIsPaused(false);
-        // ensure debug state matches checkbox
+        // ensure debug and visuals state matches checkboxes
         const scene = phaserRef.current?.scene as PhysicsSimulation;
         scene?.setDebug(showDebug);
+        scene?.setVisuals(showVisuals);
     };
 
     const handleDebugChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -53,6 +55,13 @@ function App() {
         setShowDebug(checked);
         const scene = phaserRef.current?.scene as PhysicsSimulation;
         scene?.setDebug(checked);
+    };
+
+    const handleVisualsChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const checked = e.target.checked;
+        setShowVisuals(checked);
+        const scene = phaserRef.current?.scene as PhysicsSimulation;
+        scene?.setVisuals(checked);
     };
 
     const handleSpawnBall = () => {
@@ -98,6 +107,10 @@ function App() {
                     <label style={{ display: 'block', marginTop: '8px' }}>
                         <input type="checkbox" checked={showDebug} onChange={handleDebugChange} />
                         {' '}Debug
+                    </label>
+                    <label style={{ display: 'block', marginTop: '8px' }}>
+                        <input type="checkbox" checked={showVisuals} onChange={handleVisualsChange} />
+                        {' '}Visuals
                     </label>
                 </div>
             </div>

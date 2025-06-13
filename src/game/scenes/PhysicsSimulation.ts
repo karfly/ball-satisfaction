@@ -71,7 +71,10 @@ export class PhysicsSimulation extends Scene {
     private debugCanvas!: HTMLCanvasElement;
     private debugCtx!: CanvasRenderingContext2D;
     private debugDraw: any;
-    private debugEnabled: boolean = false;
+    private debugEnabled: boolean = true;
+
+    // Visual rendering control
+    private visualsEnabled: boolean = true;
 
     constructor() {
         super('PhysicsSimulation');
@@ -82,6 +85,9 @@ export class PhysicsSimulation extends Scene {
         this.setupDebugCanvas();
         this.createCircleWall();
         this.spawnBall();
+
+        // Apply initial visual state
+        this.setVisuals(this.visualsEnabled);
 
         EventBus.emit('current-scene-ready', this);
     }
@@ -262,6 +268,17 @@ export class PhysicsSimulation extends Scene {
         this.debugEnabled = enabled;
         if (this.debugCanvas) {
             this.debugCanvas.style.display = enabled ? 'block' : 'none';
+        }
+    }
+
+    public setVisuals(enabled: boolean) {
+        this.visualsEnabled = enabled;
+
+        // Toggle visibility of visual elements
+        this.circleWall.setVisible(enabled);
+
+        for (const ball of this.balls) {
+            ball.setVisible(enabled);
         }
     }
 }
