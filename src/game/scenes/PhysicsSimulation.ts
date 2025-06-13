@@ -27,7 +27,15 @@ import {
     b2World_Draw,
     b2Body_SetAngularVelocity,
     b2Body_GetRotation,
-    b2Rot_GetAngle
+    b2Rot_GetAngle,
+    b2Body_SetUserData,
+    b2Shape_EnableSensorEvents,
+    b2World_GetSensorEvents,
+    b2Shape_GetBody,
+    b2CreatePolygonShape,
+    b2MakeOffsetBox,
+    b2DefaultShapeDef,
+    b2Body_GetUserData
 } from '../../lib/PhaserBox2D-Debug.js';
 
 // Simple physics constants
@@ -86,6 +94,10 @@ export class PhysicsSimulation extends Scene {
 
     // Visual rendering control
     private visualsEnabled: boolean = true;
+
+    // Hole sensor tracking
+    private holeSensorShapeId: any;
+    private triggeredBallBodies: Set<any> = new Set();
 
     constructor() {
         super('PhysicsSimulation');
@@ -253,6 +265,38 @@ export class PhysicsSimulation extends Scene {
             const rightPrev = visualPoints[visualPoints.length - 3];
             makeEdgeCapsule(rightEdge, rightPrev.clone().subtract(rightEdge));
         }
+
+        // --- 7. ADD SENSOR BOX ACROSS HOLE (OUTER EDGE) ---
+        const outerRadius = radius + thickness / 2;
+        const p1x = outerRadius * Math.cos(holeStartRad);
+        const p1y = outerRadius * Math.sin(holeStartRad);
+        const p2x = outerRadius * Math.cos(holeEndRad);
+        const p2y = outerRadius * Math.sin(holeEndRad);
+
+        const centerX = (p1x + p2x) / 2;
+        const centerY = (p1y + p2y) / 2;
+
+        const dx = p2x - p1x;
+        const dy = p2y - p1y;
+
+        const length = Math.sqrt(dx * dx + dy * dy);
+        const angle = Math.atan2(dy, dx);
+
+        const sensorBox = b2MakeOffsetBox(
+            pxm(length / 2), // half-width
+            pxm(0.1 / 2),    // half-height
+            new b2Vec2(pxm(centerX), pxm(-centerY)), // center position, relative to body
+            angle
+        );
+
+        const shapeDef = b2DefaultShapeDef();
+        shapeDef.isSensor = true;
+        shapeDef.customColor = 0x808080; // Gray
+
+        const sensorShapeId = b2CreatePolygonShape(bodyId, shapeDef, sensorBox);
+
+        this.holeSensorShapeId = sensorShapeId;
+        b2Shape_EnableSensorEvents(this.holeSensorShapeId, true);
     }
 
     public spawnBall() {
@@ -275,7 +319,10 @@ export class PhysicsSimulation extends Scene {
             restitution: PHYSICS_CONFIG.BALL_RESTITUTION,
             friction: PHYSICS_CONFIG.BALL_FRICTION
         });
-        b2Body_SetBullet(body.bodyId, true);
+        // b2Body_SetBullet(body.bodyId, true);
+
+        // Tag body so we can recognise it later
+        b2Body_SetUserData(body.bodyId, 'ball');
 
         // Store
         this.balls.push(ballGraphic);
@@ -311,6 +358,33 @@ export class PhysicsSimulation extends Scene {
             // Phaser's positive rotation is clockwise, whereas Box2D's positive rotation is counter-clockwise.
             // Negate the angle so the visual matches the physics body's orientation.
             this.circleWall.setRotation(-angle);
+        }
+
+        // --- Sensor processing: detect balls exiting hole ---
+        const sensorEvents = b2World_GetSensorEvents(this.worldId);
+        if (sensorEvents && sensorEvents.beginCount) {
+            for (let i = 0; i < sensorEvents.beginCount; i++) {
+                const ev = sensorEvents.beginEvents[i];
+
+                // The sensor is always the hole segment we created
+                if (
+                    this.holeSensorShapeId &&
+                    ev.sensorShapeId.index1 === this.holeSensorShapeId.index1
+                ) {
+                    const visitorBodyId = b2Shape_GetBody(ev.visitorShapeId);
+                    const visitorUserData = b2Body_GetUserData(visitorBodyId);
+
+                    if (
+                        visitorUserData === 'ball' &&
+                        !this.triggeredBallBodies.has(visitorBodyId.index1)
+                    ) {
+                        this.triggeredBallBodies.add(visitorBodyId.index1);
+                        // Spawn two new balls when first exiting
+                        this.spawnBall();
+                        this.spawnBall();
+                    }
+                }
+            }
         }
 
         // Debug rendering
