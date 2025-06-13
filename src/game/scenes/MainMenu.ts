@@ -20,15 +20,26 @@ export class MainMenu extends Scene
 
         this.logo = this.add.image(512, 300, 'logo').setDepth(100);
 
-        this.title = this.add.text(512, 460, 'Main Menu', {
+        this.title = this.add.text(512, 460, 'Physics Ball Simulation', {
             fontFamily: 'Arial Black', fontSize: 38, color: '#ffffff',
             stroke: '#000000', strokeThickness: 8,
             align: 'center'
         }).setOrigin(0.5).setDepth(100);
 
+        // Add click to start instruction
+        this.add.text(512, 520, 'Click anywhere to start', {
+            fontFamily: 'Arial', fontSize: 24, color: '#ffffff',
+            align: 'center'
+        }).setOrigin(0.5).setDepth(100);
+
+        // Make the scene clickable to transition to physics simulation
+        this.input.on('pointerdown', () => {
+            this.changeScene();
+        });
+
         EventBus.emit('current-scene-ready', this);
     }
-    
+
     changeScene ()
     {
         if (this.logoTween)
@@ -37,7 +48,7 @@ export class MainMenu extends Scene
             this.logoTween = null;
         }
 
-        this.scene.start('Game');
+        this.scene.start('PhysicsSimulation');
     }
 
     moveLogo (reactCallback: ({ x, y }: { x: number, y: number }) => void)
@@ -52,7 +63,7 @@ export class MainMenu extends Scene
             {
                 this.logoTween.play();
             }
-        } 
+        }
         else
         {
             this.logoTween = this.tweens.add({

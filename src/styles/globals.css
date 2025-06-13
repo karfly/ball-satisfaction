@@ -2,7 +2,7 @@ body {
     margin: 0;
     padding: 0;
     color: rgba(255, 255, 255, 0.87);
-    background-color: #000000; 
+    background-color: #1a1a2e;
     font-family: Arial, Helvetica, sans-serif;
 }
 
@@ -11,8 +11,19 @@ body {
     height: 100vh;
     overflow: hidden;
     display: flex;
-    justify-content: center;
+    justify-content: space-between;
     align-items: center;
+}
+
+#game-container {
+    flex: 1;
+}
+
+#app > div:last-child {
+    width: 300px;
+    padding: 20px;
+    background-color: rgba(0, 0, 0, 0.3);
+    border-left: 1px solid rgba(255, 255, 255, 0.2);
 }
 
 .spritePosition {

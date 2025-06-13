@@ -29,11 +29,11 @@ export class Preloader extends Scene
 
     preload ()
     {
-        //  Load the assets for the game - Replace with your own assets
+        //  Load the assets for the game - we only need the logo for now
         this.load.setPath('assets');
 
         this.load.image('logo', 'logo.png');
-        this.load.image('star', 'star.png');
+        // Note: We removed star.png as it's not needed for physics simulation
     }
 
     create ()
