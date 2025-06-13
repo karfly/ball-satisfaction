@@ -254,7 +254,7 @@ export class PhysicsSimulation extends Scene {
 
         // --- 6. ADD CAPSULES AT HOLE CORNERS ---
         const thickness = PHYSICS_CONFIG.WALL_THICKNESS;
-        const capRadius = thickness / 2;
+        const capRadius = thickness / 3;
 
         // Helper to build a capsule that extends the visual stroke tangentially
         const makeEdgeCapsule = (edge: Phaser.Math.Vector2, tangent: Phaser.Math.Vector2) => {
@@ -305,7 +305,7 @@ export class PhysicsSimulation extends Scene {
         const angle = Math.atan2(dy, dx);
 
         const sensorBox = b2MakeOffsetBox(
-            pxm(length / 2), // half-width
+            pxm(length), // half-width
             pxm(0.1 / 2),    // half-height
             new b2Vec2(pxm(centerX), pxm(-centerY)), // center position, relative to body
             angle
