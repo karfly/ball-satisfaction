@@ -23,7 +23,10 @@ import {
     b2Body_SetBullet,
     b2DestroyBody,
     CreateDebugDraw,
-    b2World_Draw
+    b2World_Draw,
+    b2Body_SetAngularVelocity,
+    b2Body_GetRotation,
+    b2Rot_GetAngle
 } from '../../lib/PhaserBox2D-Debug.js';
 
 // Simple physics constants
@@ -31,11 +34,12 @@ const PHYSICS_CONFIG = {
     BALL_RADIUS: 20,
     BALL_COLOR: 0xff0000,
     BALL_RESTITUTION: 1.0,
-    BALL_FRICTION: 0.0,
+    BALL_FRICTION: 0.5,
 
     CIRCLE_WALL_COLOR: 0xffffff,
     WALL_RESTITUTION: 1.0,
-    WALL_FRICTION: 0.0
+    WALL_FRICTION: 0.5,
+    CIRCLE_WALL_ROTATION_SPEED: -1.0 // radians per second (negative = clockwise)
 } as const;
 
 // World constants
@@ -43,7 +47,7 @@ const WORLD_CONFIG = {
     WIDTH: 1024,
     HEIGHT: 768,
     CIRCLE_WALL_RADIUS: 250,
-    CIRCLE_WALL_SEGMENTS: 512,
+    CIRCLE_WALL_SEGMENTS: 32,
     BALL_START_X: 512,
     BALL_START_Y: 768 * 0.25, // 75% down the screen
     GRAVITY_Y: -20 // Box2D gravity (negative for downward in Phaser coords)
@@ -52,6 +56,7 @@ const WORLD_CONFIG = {
 export class PhysicsSimulation extends Scene {
     private circleWall!: Phaser.GameObjects.Graphics;
     private circleWallBody: any;
+    private circleWallBodyId: any;
 
     private balls: Phaser.GameObjects.Graphics[] = [];
     private ballBodies: any[] = [];
@@ -128,17 +133,17 @@ export class PhysicsSimulation extends Scene {
         // Visual circle wall
         this.circleWall = this.add.graphics();
         this.circleWall.lineStyle(6, PHYSICS_CONFIG.CIRCLE_WALL_COLOR);
-        this.circleWall.strokeCircle(
-            WORLD_CONFIG.WIDTH / 2,
-            WORLD_CONFIG.HEIGHT / 2,
-            WORLD_CONFIG.CIRCLE_WALL_RADIUS
-        );
+        this.circleWall.strokeCircle(0, 0, WORLD_CONFIG.CIRCLE_WALL_RADIUS);
+
+        // Position the graphics object at the center of the screen
+        this.circleWall.setPosition(WORLD_CONFIG.WIDTH / 2, WORLD_CONFIG.HEIGHT / 2);
 
         // Physics chain loop
         const bodyDef = b2DefaultBodyDef();
-        bodyDef.type = b2BodyType.b2_staticBody;
+        bodyDef.type = b2BodyType.b2_kinematicBody;
         bodyDef.position = pxmVec2(WORLD_CONFIG.WIDTH / 2, -WORLD_CONFIG.HEIGHT / 2);
         const bodyId = b2CreateBody(this.worldId, bodyDef);
+        this.circleWallBodyId = bodyId;
 
         const segments = WORLD_CONFIG.CIRCLE_WALL_SEGMENTS;
         const radiusM = pxm(WORLD_CONFIG.CIRCLE_WALL_RADIUS);
@@ -156,6 +161,9 @@ export class PhysicsSimulation extends Scene {
         chainDef.restitution = PHYSICS_CONFIG.WALL_RESTITUTION;
 
         this.circleWallBody = b2CreateChain(bodyId, chainDef);
+
+        // Set angular velocity for clockwise rotation
+        b2Body_SetAngularVelocity(bodyId, PHYSICS_CONFIG.CIRCLE_WALL_ROTATION_SPEED);
     }
 
     public spawnBall() {
@@ -197,6 +205,16 @@ export class PhysicsSimulation extends Scene {
         // Sync all balls
         for (let i = 0; i < this.ballBodies.length; i++) {
             BodyToSprite(this.ballBodies[i], this.balls[i]);
+        }
+
+        // Sync circle wall rotation
+        if (this.circleWallBodyId) {
+            // Continuously apply angular velocity to ensure constant rotation
+            b2Body_SetAngularVelocity(this.circleWallBodyId, PHYSICS_CONFIG.CIRCLE_WALL_ROTATION_SPEED);
+
+            const rotation = b2Body_GetRotation(this.circleWallBodyId);
+            const angle = b2Rot_GetAngle(rotation);
+            this.circleWall.setRotation(angle);
         }
 
         // Debug rendering
