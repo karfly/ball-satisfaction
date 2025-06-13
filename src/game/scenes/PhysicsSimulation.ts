@@ -22,9 +22,9 @@ import {
     b2CreateChain,
     b2Body_SetBullet,
     b2DestroyBody,
-    b2DebugDraw,
+    CreateDebugDraw,
     b2World_Draw
-} from '../../lib/PhaserBox2D.js';
+} from '../../lib/PhaserBox2D-Debug.js';
 
 // Simple physics constants
 const PHYSICS_CONFIG = {
@@ -62,8 +62,9 @@ export class PhysicsSimulation extends Scene {
     // Simulation state
     private isPaused: boolean = true;
 
-    // Debug drawing helpers
-    private debugGraphics!: Phaser.GameObjects.Graphics;
+    // Debug drawing helpers (native Box2D debug draw)
+    private debugCanvas!: HTMLCanvasElement;
+    private debugCtx!: CanvasRenderingContext2D;
     private debugDraw: any;
     private debugEnabled: boolean = false;
 
@@ -73,7 +74,7 @@ export class PhysicsSimulation extends Scene {
 
     create() {
         this.initPhysicsWorld();
-        this.setupDebugGraphics();
+        this.setupDebugCanvas();
         this.createCircleWall();
         this.spawnBall();
 
@@ -92,60 +93,35 @@ export class PhysicsSimulation extends Scene {
         this.worldId = world.worldId;
     }
 
-    private setupDebugGraphics() {
-        this.debugGraphics = this.add.graphics();
-        this.debugGraphics.setDepth(1000);
-        this.debugGraphics.setVisible(this.debugEnabled);
+    private setupDebugCanvas() {
+        // Create an overlay canvas that sits above the Phaser canvas
+        this.debugCanvas = document.createElement('canvas');
+        this.debugCanvas.width = WORLD_CONFIG.WIDTH;
+        this.debugCanvas.height = WORLD_CONFIG.HEIGHT;
+        this.debugCanvas.style.position = 'absolute';
+        this.debugCanvas.style.top = '0';
+        this.debugCanvas.style.left = '0';
+        this.debugCanvas.style.pointerEvents = 'none';
+        this.debugCanvas.style.zIndex = '1000';
+
+        // Append to the same parent as Phaser's canvas
+        this.game.canvas.parentElement?.appendChild(this.debugCanvas);
+
+        // Canvas 2D context
+        this.debugCtx = this.debugCanvas.getContext('2d') as CanvasRenderingContext2D;
 
         const SCALE = 30;
-        this.debugDraw = new b2DebugDraw();
+        this.debugDraw = CreateDebugDraw(this.debugCanvas, this.debugCtx, SCALE);
 
-        const toPxX = (x: number) => x * SCALE;
-        const toPxY = (y: number) => -y * SCALE;
+        // Shift world origin (0,0) from canvas centre to top-left so it lines-up with sprite positions
+        const dpi = window.devicePixelRatio || 1;
+        const logicalW = this.debugCanvas.width / dpi;
+        const logicalH = this.debugCanvas.height / dpi;
+        this.debugDraw.positionOffset.x = -logicalW / 2;
+        this.debugDraw.positionOffset.y = -logicalH / 2;
 
-        // Line, circle, polygon
-        this.debugDraw.DrawSegment = (p1: any, p2: any, color: number) => {
-            this.debugGraphics.lineStyle(1, color & 0xffffff, 1);
-            this.debugGraphics.beginPath();
-            this.debugGraphics.moveTo(toPxX(p1.x), toPxY(p1.y));
-            this.debugGraphics.lineTo(toPxX(p2.x), toPxY(p2.y));
-            this.debugGraphics.strokePath();
-        };
-
-        this.debugDraw.DrawCircle = (center: any, radius: number, color: number) => {
-            this.debugGraphics.lineStyle(1, color & 0xffffff, 1);
-            this.debugGraphics.strokeCircle(toPxX(center.x), toPxY(center.y), radius * SCALE);
-        };
-
-        this.debugDraw.DrawPolygon = (xf: any, verts: any[], count: number, color: number) => {
-            if (count <= 0) return;
-            this.debugGraphics.lineStyle(1, color & 0xffffff, 1);
-            this.debugGraphics.beginPath();
-            const rot = xf.q;
-            const trans = xf.p;
-            const transformPoint = (v: any) => {
-                const x = rot.c * v.x - rot.s * v.y + trans.x;
-                const y = rot.s * v.x + rot.c * v.y + trans.y;
-                return { x, y };
-            };
-            const first = transformPoint(verts[0]);
-            this.debugGraphics.moveTo(toPxX(first.x), toPxY(first.y));
-            for (let i = 1; i < count; ++i) {
-                const p = transformPoint(verts[i]);
-                this.debugGraphics.lineTo(toPxX(p.x), toPxY(p.y));
-            }
-            this.debugGraphics.lineTo(toPxX(first.x), toPxY(first.y));
-            this.debugGraphics.strokePath();
-        };
-
-        // Fallbacks for solid drawing
-        this.debugDraw.DrawSolidCircle = (xf: any, radius: number, color: number) => {
-            const center = xf.p;
-            this.debugDraw.DrawCircle(center, radius, color);
-        };
-        this.debugDraw.DrawSolidPolygon = (xf: any, verts: any[], count: number, color: number) => {
-            this.debugDraw.DrawPolygon(xf, verts, count, color);
-        };
+        // Initial visibility
+        this.debugCanvas.style.display = this.debugEnabled ? 'block' : 'none';
     }
 
     private createCircleWall() {
@@ -224,8 +200,8 @@ export class PhysicsSimulation extends Scene {
         }
 
         // Debug rendering
-        if (this.debugEnabled && this.debugGraphics && this.debugDraw) {
-            this.debugGraphics.clear();
+        if (this.debugEnabled && this.debugCtx && this.debugDraw) {
+            this.debugCtx.clearRect(0, 0, this.debugCanvas.width, this.debugCanvas.height);
             b2World_Draw(this.worldId, this.debugDraw);
         }
     }
@@ -266,8 +242,8 @@ export class PhysicsSimulation extends Scene {
 
     public setDebug(enabled: boolean) {
         this.debugEnabled = enabled;
-        if (this.debugGraphics) {
-            this.debugGraphics.setVisible(enabled);
+        if (this.debugCanvas) {
+            this.debugCanvas.style.display = enabled ? 'block' : 'none';
         }
     }
 }
