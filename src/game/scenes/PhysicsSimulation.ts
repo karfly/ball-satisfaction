@@ -47,7 +47,7 @@ const WORLD_CONFIG = {
     WIDTH: 1024,
     HEIGHT: 768,
     CIRCLE_WALL_RADIUS: 250,
-    CIRCLE_WALL_SEGMENTS: 32,
+    CIRCLE_WALL_SEGMENTS: 128,
     CIRCLE_WALL_HOLE_SIZE_DEGREES: 45,
     CIRCLE_WALL_HOLE_POSITION_DEGREES: 90, // Top of the circle (0=right, 90=top, 180=left, 270=bottom)
     BALL_START_X: 512,
@@ -151,24 +151,27 @@ export class PhysicsSimulation extends Scene {
         const segments = WORLD_CONFIG.CIRCLE_WALL_SEGMENTS;
         const radius = WORLD_CONFIG.CIRCLE_WALL_RADIUS;
 
-        // We generate points for the wall section by starting at the end of the hole,
-        // wrapping all the way around, and stopping at the beginning of the hole.
-        const wallStartRad = holeEndRad;
-        const wallEndRad = wallStartRad + 2 * Math.PI; // Add 2*PI to loop around
+        // The solid wall occupies the arc that is NOT the hole.
+        // Start from the end of the hole and walk around the circle until we reach the
+        // beginning of the hole.
+        const wallArcRad = 2 * Math.PI - holeSizeRad; // total radians for the wall
+        const angleStep = wallArcRad / segments;      // uniform step size
 
         const visualPoints: Phaser.Math.Vector2[] = [];
-        const physicsPoints: any[] = []; // Array for b2Vec2 points
+        const physicsPoints: any[] = [];
 
-        const angleStep = (wallEndRad - wallStartRad) / segments;
-
-        for (let i = 0; i < segments; i++) { // NOTE: '< segments' to avoid duplicate first/last point
-            const currentAngle = wallStartRad + i * angleStep;
+        for (let i = 0; i <= segments; i++) {
+            const currentAngle = holeEndRad + i * angleStep;
             const x = radius * Math.cos(currentAngle);
             const y = radius * Math.sin(currentAngle);
 
-            // Create points for visual rendering (pixels)
-            visualPoints.push(new Phaser.Math.Vector2(x, y));
-            // Physics points will be reversed later to ensure clockwise order (normals pointing inward)
+            // For visual rendering we omit the first and last points – they correspond to the
+            // exact edges of the hole and leaving them out avoids small caps being drawn.
+            if (i !== 0 && i !== segments) {
+                visualPoints.push(new Phaser.Math.Vector2(x, y));
+            }
+
+            // Physics chain needs the full set, including the two end‐points.
             physicsPoints.push(new b2Vec2(pxm(x), pxm(-y)));
         }
 
