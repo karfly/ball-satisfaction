@@ -21,6 +21,7 @@ import {
     b2DefaultChainDef,
     b2CreateChain,
     b2Body_SetBullet,
+    b2DestroyBody,
     b2DebugDraw,
     b2World_Draw
 } from '../../lib/PhaserBox2D.js';
@@ -30,11 +31,11 @@ const PHYSICS_CONFIG = {
     BALL_RADIUS: 20,
     BALL_COLOR: 0xff0000,
     BALL_RESTITUTION: 1.0,
-    BALL_FRICTION: 0.1,
+    BALL_FRICTION: 0.0,
 
     CIRCLE_WALL_COLOR: 0xffffff,
     WALL_RESTITUTION: 1.0,
-    WALL_FRICTION: 0.1
+    WALL_FRICTION: 0.0
 } as const;
 
 // World constants
@@ -49,11 +50,11 @@ const WORLD_CONFIG = {
 } as const;
 
 export class PhysicsSimulation extends Scene {
-    private ball!: Phaser.GameObjects.Graphics;
     private circleWall!: Phaser.GameObjects.Graphics;
-    // Box2D body wrapper objects returned from CreateCircle / chain
-    private ballBody: any;
     private circleWallBody: any;
+
+    private balls: Phaser.GameObjects.Graphics[] = [];
+    private ballBodies: any[] = [];
 
     // Box2D world identifier
     private worldId: any;
@@ -74,7 +75,7 @@ export class PhysicsSimulation extends Scene {
         this.initPhysicsWorld();
         this.setupDebugGraphics();
         this.createCircleWall();
-        this.createBall();
+        this.spawnBall();
 
         EventBus.emit('current-scene-ready', this);
     }
@@ -181,24 +182,31 @@ export class PhysicsSimulation extends Scene {
         this.circleWallBody = b2CreateChain(bodyId, chainDef);
     }
 
-    private createBall() {
-        // Visual ball
-        this.ball = this.add.graphics();
-        this.ball.fillStyle(PHYSICS_CONFIG.BALL_COLOR);
-        this.ball.fillCircle(0, 0, PHYSICS_CONFIG.BALL_RADIUS);
-        this.ball.setPosition(WORLD_CONFIG.BALL_START_X, WORLD_CONFIG.BALL_START_Y);
+    public spawnBall() {
+        const offset = (Math.random() * 2 - 1) * WORLD_CONFIG.CIRCLE_WALL_RADIUS * 0.1;
+        const spawnX = WORLD_CONFIG.BALL_START_X + offset;
+        const spawnY = WORLD_CONFIG.BALL_START_Y;
 
-        // Physics ball
-        this.ballBody = CreateCircle({
+        // Visual
+        const ballGraphic = this.add.graphics();
+        ballGraphic.fillStyle(PHYSICS_CONFIG.BALL_COLOR);
+        ballGraphic.fillCircle(0, 0, PHYSICS_CONFIG.BALL_RADIUS);
+        ballGraphic.setPosition(spawnX, spawnY);
+
+        // Physics
+        const body = CreateCircle({
             worldId: this.worldId,
             type: b2BodyType.b2_dynamicBody,
-            position: pxmVec2(WORLD_CONFIG.BALL_START_X, -WORLD_CONFIG.BALL_START_Y),
+            position: pxmVec2(spawnX, -spawnY),
             radius: pxm(PHYSICS_CONFIG.BALL_RADIUS),
             restitution: PHYSICS_CONFIG.BALL_RESTITUTION,
             friction: PHYSICS_CONFIG.BALL_FRICTION
         });
+        b2Body_SetBullet(body.bodyId, true);
 
-        b2Body_SetBullet(this.ballBody.bodyId, true);
+        // Store
+        this.balls.push(ballGraphic);
+        this.ballBodies.push(body);
     }
 
     update() {
@@ -210,9 +218,9 @@ export class PhysicsSimulation extends Scene {
             WorldStep({ worldId: this.worldId, deltaTime: dt });
         }
 
-        // Sync visual ball with physics body
-        if (this.ballBody && this.ball) {
-            BodyToSprite(this.ballBody, this.ball);
+        // Sync all balls
+        for (let i = 0; i < this.ballBodies.length; i++) {
+            BodyToSprite(this.ballBodies[i], this.balls[i]);
         }
 
         // Debug rendering
@@ -239,21 +247,18 @@ export class PhysicsSimulation extends Scene {
     }
 
     public resetSimulation() {
-        if (!this.ballBody) return;
+        // Destroy existing balls
+        for (let i = 0; i < this.ballBodies.length; i++) {
+            b2DestroyBody(this.ballBodies[i].bodyId);
+            this.balls[i].destroy();
+        }
+        this.ballBodies = [];
+        this.balls = [];
 
-        // Reset the physical body back to the spawn location with zero velocity
-        b2Body_SetTransform(
-            this.ballBody.bodyId,
-            pxmVec2(WORLD_CONFIG.BALL_START_X, -WORLD_CONFIG.BALL_START_Y),
-            undefined
-        );
+        // Spawn a fresh single ball
+        this.spawnBall();
 
-        b2Body_SetLinearVelocity(this.ballBody.bodyId, new b2Vec2(0, 0));
-
-        // Visually sync immediately
-        BodyToSprite(this.ballBody, this.ball);
-
-        // Keep simulation paused after reset until explicitly started
+        // Pause until started
         this.isPaused = true;
 
         console.log('Simulation reset');

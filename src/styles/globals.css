@@ -39,7 +39,9 @@ body {
 
 .button-container {
     display: flex;
-    justify-content: center;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
 }
 
 .info-panel {

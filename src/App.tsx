@@ -55,6 +55,11 @@ function App() {
         scene?.setDebug(checked);
     };
 
+    const handleSpawnBall = () => {
+        const scene = phaserRef.current?.scene as PhysicsSimulation;
+        scene?.spawnBall();
+    };
+
     // FPS updater
     useEffect(() => {
         let frameId: number;
@@ -81,6 +86,9 @@ function App() {
                             {isPaused ? 'Resume' : 'Pause'}
                         </button>
                     )}
+                    <button className="button" onClick={handleSpawnBall} style={{ marginLeft: '8px' }}>
+                        Spawn Ball
+                    </button>
                 </div>
 
                 <div className="info-panel">
