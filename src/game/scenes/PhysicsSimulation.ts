@@ -69,7 +69,7 @@ const WORLD_CONFIG = {
     CIRCLE_WALL_HOLE_POSITION_DEGREES: 90, // Top of the circle (0=right, 90=top, 180=left, 270=bottom)
 
     BALL_START_X: 512,
-    BALL_START_Y: 768 * (0.5), // 75% down the screen
+    BALL_START_Y: 768 * (0.1), // 75% down the screen
     GRAVITY_Y: -20 // Box2D gravity (negative for downward in Phaser coords)
 } as const;
 
@@ -189,12 +189,14 @@ export class PhysicsSimulation extends Scene {
         // The visual line is drawn centred on `radius` with a thickness, so its inner edge
         // is `radius - WALL_THICKNESS / 2`.
         const physicsRadius = radius - PHYSICS_CONFIG.WALL_THICKNESS / 2;
+        const outerPhysicsRadius = radius + PHYSICS_CONFIG.WALL_THICKNESS / 2;
 
         const wallArcRad = 2 * Math.PI - holeSizeRad; // total radians for the wall
         const angleStep = wallArcRad / segments;      // uniform step size
 
         const visualPoints: Phaser.Math.Vector2[] = [];
         const physicsPoints: any[] = [];
+        const outerPhysicsPoints: any[] = [];
 
         for (let i = 0; i <= segments; i++) {
             const currentAngle = holeEndRad + i * angleStep;
@@ -219,6 +221,11 @@ export class PhysicsSimulation extends Scene {
 
             // Physics chain needs the full set, including the two end‐points.
             physicsPoints.push(new b2Vec2(pxm(px), pxm(-py)));
+
+            // Outer physics point at the outer surface (no noise)
+            const ox = outerPhysicsRadius * Math.cos(currentAngle);
+            const oy = outerPhysicsRadius * Math.sin(currentAngle);
+            outerPhysicsPoints.push(new b2Vec2(pxm(ox), pxm(-oy)));
         }
 
         // --- 3. CREATE VISUAL WALL ---
@@ -247,6 +254,16 @@ export class PhysicsSimulation extends Scene {
         chainDef.restitution = PHYSICS_CONFIG.WALL_RESTITUTION;
 
         this.circleWallBody = b2CreateChain(bodyId, chainDef);
+
+        const outerChainDef = b2DefaultChainDef();
+        // The outer wall needs to be wound in the opposite direction (CCW) for its
+        // normals to point outwards and contain the balls.
+        outerChainDef.points = outerPhysicsPoints.reverse();
+        outerChainDef.count = outerPhysicsPoints.length;
+        outerChainDef.isLoop = false;
+        outerChainDef.friction = PHYSICS_CONFIG.WALL_FRICTION;
+        outerChainDef.restitution = PHYSICS_CONFIG.WALL_RESTITUTION;
+        b2CreateChain(bodyId, outerChainDef);
 
         // --- 5. SET ROTATION ---
         // Set angular velocity for clockwise rotation, same as before
