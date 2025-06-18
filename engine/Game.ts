@@ -13,6 +13,7 @@ export class Game {
   debugRenderer!: DebugRenderer;
 
   async init(container: HTMLElement) {
+    try {
         const R = await import("@dimforge/rapier2d-deterministic");
 
         this.world = new R.World({ x: 0, y: 9.81 });       // m/s² downward
@@ -33,6 +34,9 @@ export class Game {
     this.prefabs.forEach(p => this.app.stage.addChild(p.graphic));
 
     this.startLoop();
+    } catch (error) {
+      console.error("Failed to initialize game:", error);
+    }
   }
 
   private startLoop() {

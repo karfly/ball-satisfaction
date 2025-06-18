@@ -18,7 +18,8 @@ export class Ground extends Prefab {
   protected createPhysics(R: typeof RAPIER) {
     this.body = this.world.createRigidBody(R.RigidBodyDesc.fixed()
       .setTranslation(this.w / 2, this.groundY));
-    this.world.createCollider(R.ColliderDesc.cuboid(this.w / 2, 0.2), this.body);
+    const collider = R.ColliderDesc.cuboid(this.w / 2, 0.2).setRestitution(0.8);
+    this.world.createCollider(collider, this.body);
   }
 
   protected createGraphics() {

@@ -19,7 +19,8 @@ export class Ball extends Prefab {
     this.body = this.world.createRigidBody(
       R.RigidBodyDesc.dynamic().setTranslation(p2m(this.spawnX), p2m(this.spawnY))
     );
-    this.world.createCollider(R.ColliderDesc.ball(this.radius), this.body);
+    const collider = R.ColliderDesc.ball(this.radius).setRestitution(0.8);
+    this.world.createCollider(collider, this.body);
   }
 
   protected createGraphics() {
