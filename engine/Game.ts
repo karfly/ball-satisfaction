@@ -1,6 +1,6 @@
 import * as PIXI from "pixi.js";
 import type RAPIER from "@dimforge/rapier2d-deterministic";
-import { Ball, Ground, Prefab } from "./prefabs";
+import { Ball, Ring, Prefab, type RingSpec } from "./prefabs";
 import { m2p } from "./scale";
 import { DebugUI } from "./debug/DebugUI";
 import { DebugRenderer } from "./debug/DebugRenderer";
@@ -9,14 +9,17 @@ export class Game {
   app!: PIXI.Application;
   world!: RAPIER.World;
   prefabs: Prefab[] = [];
+  balls: Ball[] = [];
+  ring!: Ring;
+  R!: typeof RAPIER;
   debugUI!: DebugUI;
   debugRenderer!: DebugRenderer;
 
   async init(container: HTMLElement) {
     try {
-        const R = await import("@dimforge/rapier2d-deterministic");
+        this.R = await import("@dimforge/rapier2d-deterministic");
 
-        this.world = new R.World({ x: 0, y: 9.81 });       // m/s² downward
+        this.world = new this.R.World({ x: 0, y: 20 });      // Downward gravity
     this.world.integrationParameters.dt = 1 / 60;      // fixed dt
 
     this.app = new PIXI.Application();
@@ -26,17 +29,69 @@ export class Game {
     });
     container.appendChild(this.app.canvas);
 
+    // Center the stage so (0,0) physics coordinates appear at screen center
+    this.app.stage.position.set(this.app.screen.width / 2, this.app.screen.height / 2);
+
     this.debugUI = new DebugUI(this.world, this.app);
     this.debugRenderer = new DebugRenderer(this.world, this.app.stage);
 
-    this.prefabs.push(new Ground(this.world, R, this.app.screen.width, this.app.screen.height));
-    this.prefabs.push(new Ball(this.world, R, this.app.screen.width / 2, m2p(1)));
+    // Create ring arena
+    const ringSpec: RingSpec = {
+      radius: 5.5,          // meters (smaller ring)
+      thickness: 0.3,     // meters
+      gapAngle: Math.PI / 12,  // 60 degrees gap
+      segments: 128,       // smooth edge
+      spinSpeed: 0.1        // radians per second
+    };
+
+    this.ring = new Ring(this.world, this.R, ringSpec);
+    this.prefabs.push(this.ring);
+
+    // Set up escape handler
+    this.ring.setEscapeHandler((escapedBall) => {
+      this.handleBallEscape(escapedBall);
+    });
+
+    // Spawn initial ball
+    const initialBall = Ball.createInsideRing(this.world, this.R, ringSpec.radius, ringSpec.gapAngle);
+    this.balls.push(initialBall);
+    this.prefabs.push(initialBall);
 
     this.prefabs.forEach(p => this.app.stage.addChild(p.graphic));
 
     this.startLoop();
     } catch (error) {
       console.error("Failed to initialize game:", error);
+    }
+  }
+
+  private handleBallEscape(escapedBall: RAPIER.RigidBody) {
+    // Remove the escaped ball
+    const escapedIndex = this.balls.findIndex(ball => ball.body.handle === escapedBall.handle);
+    if (escapedIndex !== -1) {
+      const escapedBallPrefab = this.balls[escapedIndex];
+      this.app.stage.removeChild(escapedBallPrefab.graphic);
+      this.balls.splice(escapedIndex, 1);
+
+      const prefabIndex = this.prefabs.indexOf(escapedBallPrefab);
+      if (prefabIndex !== -1) {
+        this.prefabs.splice(prefabIndex, 1);
+      }
+    }
+
+    this.world.removeRigidBody(escapedBall);
+
+    // Spawn two new balls inside the ring
+    const ringSpec = {
+      radius: 5.5,
+      gapAngle: Math.PI / 6
+    };
+
+    for (let i = 0; i < 2; ++i) {
+      const newBall = Ball.createInsideRing(this.world, this.R, ringSpec.radius, ringSpec.gapAngle);
+      this.balls.push(newBall);
+      this.prefabs.push(newBall);
+      this.app.stage.addChild(newBall.graphic);
     }
   }
 
@@ -51,7 +106,12 @@ export class Game {
       last = now;
 
       while (acc >= dt) {
-        this.world.step();
+        // Step the ring (spin + event handling)
+        this.ring.step(dt);
+
+        // Step the world with the ring's event queue
+        this.world.step(this.ring.getEventQueue());
+
         this.prefabs.forEach(p => p.updateFromPhysics());
         acc -= dt;
       }
@@ -68,9 +128,12 @@ export class Game {
         this.debugRenderer.layer.clear();
       }
 
-      // Update debug info
-      this.debugUI.params.ballY_px = Math.round(m2p(this.prefabs[1].body.translation().y));
-      this.debugUI.params.ballY_m = +this.prefabs[1].body.translation().y.toFixed(2);
+      // Update debug info - show ball count instead
+      this.debugUI.params.ballCount = this.balls.length;
+      if (this.balls.length > 0) {
+        this.debugUI.params.ballY_px = Math.round(m2p(this.balls[0].body.translation().y));
+        this.debugUI.params.ballY_m = +this.balls[0].body.translation().y.toFixed(2);
+      }
     });
   }
 
