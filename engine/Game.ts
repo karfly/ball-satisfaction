@@ -31,6 +31,7 @@ export class Game {
 
     this.prefabs.push(new Ground(this.world, R, this.app.screen.width, this.app.screen.height));
     this.prefabs.push(new Ball(this.world, R, this.app.screen.width / 2, m2p(1)));
+
     this.prefabs.forEach(p => this.app.stage.addChild(p.graphic));
 
     this.startLoop();
