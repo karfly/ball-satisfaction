@@ -29,7 +29,7 @@ const GAME_CONFIG = {
     gapAngle: Math.PI / 8.0, // 15 degrees
     gapCenterAngle: 3/2 * Math.PI, // Gap center at top (12 o'clock position)
     // gapCenterAngle: Math.PI / 2, // Gap center at top (12 o'clock position)
-    segments: 128,
+    segments: 256,
     spinSpeed: 0.5,
     restitution: 1.0,
     friction: 0.1,

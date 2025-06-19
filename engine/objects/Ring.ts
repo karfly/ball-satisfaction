@@ -118,7 +118,7 @@ export class Ring extends Prefab {
       }
 
       this.world.createCollider(
-        this.R.ColliderDesc.cuboid(halfBarLen, this.config.thickness / 2)
+        this.R.ColliderDesc.cuboid(this.config.thickness / 2, this.config.thickness / 2)
           .setTranslation(
             this.config.radius * Math.cos(midAngle),
             this.config.radius * Math.sin(midAngle)
