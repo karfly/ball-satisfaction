@@ -33,6 +33,7 @@ export class Ring extends Prefab {
     this.body = this.world.createRigidBody(
       R.RigidBodyDesc.kinematicPositionBased()
         .setTranslation(0, 0)  // Physics coordinates centered at origin
+        .setCcdEnabled(true)  // Enable CCD for rotating ring
     );
 
     // Create cuboid segments

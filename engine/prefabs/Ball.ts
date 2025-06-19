@@ -4,7 +4,7 @@ import { Prefab } from "./Prefab";
 import { p2m, m2p } from "../scale";
 
 export class Ball extends Prefab {
-  radius = 0.133;  // 3x smaller than original 0.4
+  radius = 0.2;  // 3x smaller than original 0.4
   private spawnX: number;
   private spawnY: number;
 
@@ -23,7 +23,7 @@ export class Ball extends Prefab {
     const minAngle = Math.PI / 4;      // 45 degrees
     const maxAngle = 3 * Math.PI / 4;  // 135 degrees
     const dir = minAngle + Math.random() * (maxAngle - minAngle);
-    const velocity = 10;
+    const velocity = 100;
     ball.body.setLinvel({ x: velocity * Math.cos(dir), y: velocity * Math.sin(dir) }, true);
 
     return ball;
@@ -33,6 +33,7 @@ export class Ball extends Prefab {
     this.body = this.world.createRigidBody(
       R.RigidBodyDesc.dynamic()
         .setTranslation(this.spawnX, this.spawnY)  // Already in meters
+        .setCcdEnabled(true)  // Enable CCD for fast-moving balls
     );
     const collider = R.ColliderDesc.ball(this.radius)
       .setRestitution(1)
