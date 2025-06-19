@@ -13,7 +13,7 @@ const GAME_CONFIG = {
   },
 
   gameplay: {
-    maxBalls: 100
+    maxBalls: 500
   },
 
   ball: {
