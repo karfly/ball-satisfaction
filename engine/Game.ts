@@ -1,6 +1,6 @@
 import * as PIXI from "pixi.js";
 import type RAPIER from "@dimforge/rapier2d-deterministic";
-import { Ball, Ring, KillBoundary, Prefab, type BallConfig, type RingConfig, type GroundConfig, type BallSpawnConfig, type KillBoundaryConfig } from "./objects";
+import { Ball, Ring, KillBoundary, Prefab, type BallConfig, type RingConfig, type BallSpawnConfig, type KillBoundaryConfig } from "./objects";
 import { m2p } from "./scale";
 import { DebugUI } from "./debug/DebugUI";
 import { DebugRenderer } from "./debug/DebugRenderer";
@@ -38,14 +38,6 @@ const GAME_CONFIG = {
     sensorThickness: 0.2
   } as RingConfig,
 
-  ground: {
-    width: 20, // Will be overridden based on screen size
-    thickness: 0.2,
-    restitution: 0.8,
-    color: 0x00ff00,
-    bottomOffset: 0.5
-  } as GroundConfig,
-
   spawning: {
     initial: {
       position: { x: 0, y: 0 },
@@ -62,10 +54,7 @@ const GAME_CONFIG = {
 
   killBoundary: {
     thickness: 1.0,
-    offset: 1.0,
-    debugVisible: true,
-    debugColor: 0xff0000,
-    debugAlpha: 0.5
+    offset: 1.0
   } as KillBoundaryConfig
 } as const;
 

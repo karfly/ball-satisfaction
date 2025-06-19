@@ -142,26 +142,6 @@ export class Ring extends Prefab {
       g.addChild(segmentGraphic);
     }
 
-    // Draw sensor ring (debug)
-    const sensorRadius = this.config.radius + this.config.thickness + this.config.sensorOffset + this.config.sensorThickness / 2;
-    const sensorAngleStep = (2 * Math.PI) / this.config.segments;
-    const sensorHalfBarLen = (sensorRadius * sensorAngleStep) / 2;
-
-    for (let i = 0; i < this.config.segments; ++i) {
-      const midAngle = sensorAngleStep * (i + 0.5);
-      const x = sensorRadius * Math.cos(midAngle);
-      const y = sensorRadius * Math.sin(midAngle);
-
-      const sensorSeg = new PIXI.Graphics();
-      sensorSeg.rect(-m2p(sensorHalfBarLen), -m2p(this.config.sensorThickness / 2),
-                     m2p(sensorHalfBarLen * 2), m2p(this.config.sensorThickness));
-      sensorSeg.fill(0xff0000, 0.2);
-      sensorSeg.position.set(m2p(x), m2p(y));
-      sensorSeg.rotation = midAngle;
-
-      g.addChild(sensorSeg);
-    }
-
     this.graphic = g;
   }
 

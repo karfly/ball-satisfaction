@@ -20,14 +20,6 @@ export interface RingConfig {
   sensorThickness: number;
 }
 
-export interface GroundConfig {
-  width: number;
-  thickness: number;
-  restitution: number;
-  color: number;
-  bottomOffset: number;
-}
-
 export interface BallSpawnConfig {
   position: { x: number; y: number };
   velocity: { magnitude: number; angle: number } | { x: number; y: number };
@@ -37,7 +29,4 @@ export interface BallSpawnConfig {
 export interface KillBoundaryConfig {
   thickness: number;
   offset: number; // Distance beyond screen edges (in physics units)
-  debugVisible: boolean;
-  debugColor: number;
-  debugAlpha: number;
 }
