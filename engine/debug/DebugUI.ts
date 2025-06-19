@@ -9,21 +9,36 @@ export class DebugUI {
   params = {
     "View colliders": true,
     "View graphics": true,
-    ballY_px: 0,
-    ballY_m: 0,
     ballCount: 0,
-    totalSpawned: 0
+    totalSpawned: 0,
+    escapedBalls: 0
   };
 
   constructor(private world: RAPIER.World, app: PIXI.Application) {
     this.stats = new Stats(app.renderer);                      // FPS/DC/MS overlay
 
+    // Add required CSS styling for stats display
+    const style = document.createElement('style');
+    style.textContent = `
+      #stats {
+        position: fixed;
+        top: 0;
+        left: 0;
+        z-index: 1000;
+      }
+      #stats canvas {
+        width: max(100px, 10vw, 10vh);
+        height: max(60px, 6vh, 6vw);
+        user-select: none;
+      }
+    `;
+    document.head.appendChild(style);
+
     this.gui.add(this.params, "View colliders");
     this.gui.add(this.params, "View graphics");
-    this.gui.add(this.params, "ballY_px").listen();
-    this.gui.add(this.params, "ballY_m").listen();
     this.gui.add(this.params, "ballCount").listen();
     this.gui.add(this.params, "totalSpawned").listen();
+    this.gui.add(this.params, "escapedBalls").listen();
   }
 
     destroy() {

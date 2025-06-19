@@ -18,7 +18,7 @@ const GAME_CONFIG = {
 
   ball: {
     radius: 0.2,
-    restitution: 1.0,
+    restitution: 0.9,
     friction: 0.0,
     color: 0xff3333
   } as BallConfig,
@@ -80,6 +80,7 @@ export class Game {
   debugUI!: DebugUI;
   debugRenderer!: DebugRenderer;
   totalBallsSpawned: number = 0;
+  escapedBallsCount: number = 0;
 
   async init(container: HTMLElement) {
     try {
@@ -196,7 +197,10 @@ export class Game {
   }
 
   private handleBallRingTouch(touchedBall: RAPIER.RigidBody) {
-    // Ring touch only triggers spawning, not destruction
+    // Ring touch means ball escaped through the gap - increment counter
+    this.escapedBallsCount++;
+
+    // Ring touch also triggers spawning of new balls
     this.spawnRingTouchBalls();
   }
 
@@ -268,10 +272,7 @@ export class Game {
       // Update debug info - show ball count instead
       this.debugUI.params.ballCount = this.balls.length;
       this.debugUI.params.totalSpawned = this.totalBallsSpawned;
-      if (this.balls.length > 0) {
-        this.debugUI.params.ballY_px = Math.round(m2p(this.balls[0].body.translation().y));
-        this.debugUI.params.ballY_m = +this.balls[0].body.translation().y.toFixed(2);
-      }
+      this.debugUI.params.escapedBalls = this.escapedBallsCount;
     });
   }
 
