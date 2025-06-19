@@ -1,14 +1,64 @@
 import * as PIXI from "pixi.js";
 import type RAPIER from "@dimforge/rapier2d-deterministic";
-import { Ball, Ring, Prefab, type RingSpec } from "./prefabs";
+import { Ball, Ring, Prefab, type BallConfig, type RingConfig, type GroundConfig, type BallSpawnConfig } from "./objects";
 import { m2p } from "./scale";
 import { DebugUI } from "./debug/DebugUI";
 import { DebugRenderer } from "./debug/DebugRenderer";
 
+// Centralized Game Configuration
+const GAME_CONFIG = {
+  physics: {
+    gravity: { x: 0, y: 20 },
+    fixedDt: 1/60
+  },
+
+  ball: {
+    radius: 0.2,
+    restitution: 1.0,
+    friction: 0.0,
+    color: 0xff3333,
+    ccdEnabled: true
+  } as BallConfig,
+
+  ring: {
+    radius: 5.5,
+    thickness: 0.3,
+    gapAngle: Math.PI / 12, // 15 degrees
+    segments: 128,
+    spinSpeed: 0.1,
+    restitution: 1.0,
+    friction: 0.0,
+    color: 0x00ffff,
+    sensorOffset: 0.5
+  } as RingConfig,
+
+  ground: {
+    width: 20, // Will be overridden based on screen size
+    thickness: 0.2,
+    restitution: 0.8,
+    color: 0x00ff00,
+    bottomOffset: 0.5
+  } as GroundConfig,
+
+  spawning: {
+    initial: {
+      position: { x: 0, y: 0 },
+      velocity: { magnitude: 100, angle: 0 },
+      angleRange: { min: Math.PI/4, max: 3*Math.PI/4 }
+    },
+    onEscape: {
+      count: 2,
+      position: { x: 0, y: 0 },
+      velocity: { magnitude: 100, angle: 0 },
+      angleRange: { min: Math.PI/4, max: 3*Math.PI/4 }
+    }
+  }
+} as const;
+
 export class Game {
   app!: PIXI.Application;
   world!: RAPIER.World;
-  prefabs: Prefab[] = [];
+  objects: Prefab[] = [];
   balls: Ball[] = [];
   ring!: Ring;
   R!: typeof RAPIER;
@@ -17,51 +67,88 @@ export class Game {
 
   async init(container: HTMLElement) {
     try {
-        this.R = await import("@dimforge/rapier2d-deterministic");
+      this.R = await import("@dimforge/rapier2d-deterministic");
 
-        this.world = new this.R.World({ x: 0, y: 20 });      // Downward gravity
-    this.world.integrationParameters.dt = 1 / 60;      // fixed dt
+      this.world = new this.R.World(GAME_CONFIG.physics.gravity);
+      this.world.integrationParameters.dt = GAME_CONFIG.physics.fixedDt;
 
-    this.app = new PIXI.Application();
-        await this.app.init({
-      resizeTo: window,
-      background: 0x333333
-    });
-    container.appendChild(this.app.canvas);
+      this.app = new PIXI.Application();
+      await this.app.init({
+        resizeTo: window,
+        background: 0x333333
+      });
+      container.appendChild(this.app.canvas);
 
-    // Center the stage so (0,0) physics coordinates appear at screen center
-    this.app.stage.position.set(this.app.screen.width / 2, this.app.screen.height / 2);
+      // Center the stage so (0,0) physics coordinates appear at screen center
+      this.app.stage.position.set(this.app.screen.width / 2, this.app.screen.height / 2);
 
-    this.debugUI = new DebugUI(this.world, this.app);
-    this.debugRenderer = new DebugRenderer(this.world, this.app.stage);
+      this.debugUI = new DebugUI(this.world, this.app);
+      this.debugRenderer = new DebugRenderer(this.world, this.app.stage);
 
-    // Create ring arena
-    const ringSpec: RingSpec = {
-      radius: 5.5,          // meters (smaller ring)
-      thickness: 0.3,     // meters
-      gapAngle: Math.PI / 12,  // 60 degrees gap
-      segments: 128,       // smooth edge
-      spinSpeed: 0.1        // radians per second
-    };
+      // Create ring arena
+      this.ring = new Ring(this.world, this.R, GAME_CONFIG.ring);
+      this.objects.push(this.ring);
 
-    this.ring = new Ring(this.world, this.R, ringSpec);
-    this.prefabs.push(this.ring);
+      // Set up escape handler
+      this.ring.setEscapeHandler((escapedBall) => {
+        this.handleBallEscape(escapedBall);
+      });
 
-    // Set up escape handler
-    this.ring.setEscapeHandler((escapedBall) => {
-      this.handleBallEscape(escapedBall);
-    });
+      // Spawn initial ball
+      this.spawnInitialBall();
 
-    // Spawn initial ball
-    const initialBall = Ball.createInsideRing(this.world, this.R, ringSpec.radius, ringSpec.gapAngle);
-    this.balls.push(initialBall);
-    this.prefabs.push(initialBall);
+      this.objects.forEach(obj => this.app.stage.addChild(obj.graphic));
 
-    this.prefabs.forEach(p => this.app.stage.addChild(p.graphic));
-
-    this.startLoop();
+      this.startLoop();
     } catch (error) {
       console.error("Failed to initialize game:", error);
+    }
+  }
+
+  private spawnBall(spawnConfig: BallSpawnConfig): Ball {
+    const velocity = this.calculateVelocity(spawnConfig);
+
+    const ball = new Ball(
+      this.world,
+      this.R,
+      GAME_CONFIG.ball,
+      spawnConfig.position.x,
+      spawnConfig.position.y,
+      velocity
+    );
+
+    this.balls.push(ball);
+    this.objects.push(ball);
+    this.app.stage.addChild(ball.graphic);
+
+    return ball;
+  }
+
+  private calculateVelocity(spawnConfig: BallSpawnConfig): { x: number; y: number } {
+    if ('x' in spawnConfig.velocity) {
+      return spawnConfig.velocity;
+    }
+
+    let angle = spawnConfig.velocity.angle;
+    if (spawnConfig.angleRange) {
+      const { min, max } = spawnConfig.angleRange;
+      angle = min + Math.random() * (max - min);
+    }
+
+    const magnitude = spawnConfig.velocity.magnitude;
+    return {
+      x: magnitude * Math.cos(angle),
+      y: magnitude * Math.sin(angle)
+    };
+  }
+
+  private spawnInitialBall() {
+    this.spawnBall(GAME_CONFIG.spawning.initial);
+  }
+
+  private spawnEscapeBalls() {
+    for (let i = 0; i < GAME_CONFIG.spawning.onEscape.count; i++) {
+      this.spawnBall(GAME_CONFIG.spawning.onEscape);
     }
   }
 
@@ -73,30 +160,20 @@ export class Game {
       this.app.stage.removeChild(escapedBallPrefab.graphic);
       this.balls.splice(escapedIndex, 1);
 
-      const prefabIndex = this.prefabs.indexOf(escapedBallPrefab);
+      const prefabIndex = this.objects.indexOf(escapedBallPrefab);
       if (prefabIndex !== -1) {
-        this.prefabs.splice(prefabIndex, 1);
+        this.objects.splice(prefabIndex, 1);
       }
     }
 
     this.world.removeRigidBody(escapedBall);
 
-    // Spawn two new balls inside the ring
-    const ringSpec = {
-      radius: 5.5,
-      gapAngle: Math.PI / 6
-    };
-
-    for (let i = 0; i < 2; ++i) {
-      const newBall = Ball.createInsideRing(this.world, this.R, ringSpec.radius, ringSpec.gapAngle);
-      this.balls.push(newBall);
-      this.prefabs.push(newBall);
-      this.app.stage.addChild(newBall.graphic);
-    }
+    // Spawn new balls using config
+    this.spawnEscapeBalls();
   }
 
   private startLoop() {
-    const dt = 1/60;
+    const dt = GAME_CONFIG.physics.fixedDt;
     let acc = 0;
     let last = performance.now();
 
@@ -112,13 +189,13 @@ export class Game {
         // Step the world with the ring's event queue
         this.world.step(this.ring.getEventQueue());
 
-        this.prefabs.forEach(p => p.updateFromPhysics());
+        this.objects.forEach(obj => obj.updateFromPhysics());
         acc -= dt;
       }
 
       // Handle graphics visibility
-      this.prefabs.forEach(p => {
-        p.graphic.visible = this.debugUI.params["View graphics"];
+      this.objects.forEach(obj => {
+        obj.graphic.visible = this.debugUI.params["View graphics"];
       });
 
       // Handle debug collider rendering

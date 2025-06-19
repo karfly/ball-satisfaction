@@ -6,13 +6,16 @@ export abstract class Prefab {
   body!: RAPIER.RigidBody;
   graphic!: PIXI.Container;
 
-  constructor(protected world: RAPIER.World) {}
+  constructor(
+    protected world: RAPIER.World,
+    protected R: typeof RAPIER
+  ) {}
 
-  protected abstract createPhysics(R: typeof RAPIER): void;
+  protected abstract createPhysics(): void;
   protected abstract createGraphics(): void;
 
-  init(R: typeof RAPIER) {
-    this.createPhysics(R);
+  init() {
+    this.createPhysics();
     this.createGraphics();
   }
 
