@@ -17,8 +17,8 @@ const GAME_CONFIG = {
   },
 
   ball: {
-    radius: 0.2,
-    restitution: 0.99,
+    radius: 0.25,
+    restitution: 0.9,
     friction: 0.1,
     color: 0xff3333
   } as BallConfig,
@@ -31,11 +31,11 @@ const GAME_CONFIG = {
     // gapCenterAngle: Math.PI / 2, // Gap center at top (12 o'clock position)
     segments: 256,
     spinSpeed: 0.5,
-    restitution: 1.0,
-    friction: 0.1,
+    restitution: 0.9,
+    friction: 0.9,
     color: 0x00ffff,
     sensorOffset: 0.0,
-    sensorThickness: 0.2
+    sensorThickness: 0.5
   } as RingConfig,
 
   spawning: {

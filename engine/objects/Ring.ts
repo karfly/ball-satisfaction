@@ -107,7 +107,6 @@ export class Ring extends Prefab {
 
     // Create segments distributed around full circle, skipping gap area
     const totalAngleStep = (2 * Math.PI) / this.config.segments;
-    const halfBarLen = (this.config.radius * totalAngleStep) / 2;
 
     for (let i = 0; i < this.config.segments; ++i) {
       const midAngle = totalAngleStep * (i + 0.5);
@@ -134,13 +133,12 @@ export class Ring extends Prefab {
     // Create a closed ring of sensor segments (no gap)
     const sensorRadius = this.config.radius + this.config.thickness + this.config.sensorOffset + this.config.sensorThickness / 2;
     const sensorAngleStep = (2 * Math.PI) / this.config.segments;
-    const sensorHalfBarLen = (sensorRadius * sensorAngleStep) / 2;
 
     for (let i = 0; i < this.config.segments; ++i) {
       const midAngle = sensorAngleStep * (i + 0.5);
 
       const sensorCollider = this.world.createCollider(
-        this.R.ColliderDesc.cuboid(sensorHalfBarLen, this.config.sensorThickness / 2)
+        this.R.ColliderDesc.cuboid(this.config.sensorThickness / 2, this.config.sensorThickness / 2)
           .setTranslation(
             sensorRadius * Math.cos(midAngle),
             sensorRadius * Math.sin(midAngle)
