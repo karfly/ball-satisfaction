@@ -82,7 +82,9 @@ export class Game {
       await this.app.init({
         resizeTo: window,
         antialias: true,
-        background: 0x333333
+        background: 0x333333,
+        autoDensity   : true,
+        resolution    : Math.max(2, window.devicePixelRatio),
       });
       container.appendChild(this.app.canvas);
 
