@@ -1,6 +1,6 @@
 import * as PIXI from "pixi.js";
 import type RAPIER from "@dimforge/rapier2d-deterministic";
-import { Ball, Ring, Prefab, type BallConfig, type RingConfig, type GroundConfig, type BallSpawnConfig } from "./objects";
+import { Ball, Ring, KillBoundary, Prefab, type BallConfig, type RingConfig, type GroundConfig, type BallSpawnConfig, type KillBoundaryConfig } from "./objects";
 import { m2p } from "./scale";
 import { DebugUI } from "./debug/DebugUI";
 import { DebugRenderer } from "./debug/DebugRenderer";
@@ -12,24 +12,30 @@ const GAME_CONFIG = {
     fixedDt: 1/60
   },
 
+  gameplay: {
+    maxBalls: 100
+  },
+
   ball: {
     radius: 0.2,
     restitution: 1.0,
     friction: 0.0,
-    color: 0xff3333,
-    ccdEnabled: true
+    color: 0xff3333
   } as BallConfig,
 
   ring: {
     radius: 5.5,
     thickness: 0.3,
-    gapAngle: Math.PI / 12, // 15 degrees
+    gapAngle: Math.PI / 4.0, // 15 degrees
+    gapCenterAngle: 3/2 * Math.PI, // Gap center at top (12 o'clock position)
+    // gapCenterAngle: Math.PI / 2, // Gap center at top (12 o'clock position)
     segments: 128,
-    spinSpeed: 0.1,
+    spinSpeed: 0.5,
     restitution: 1.0,
     friction: 0.0,
     color: 0x00ffff,
-    sensorOffset: 0.5
+    sensorOffset: 0.0,
+    sensorThickness: 0.2
   } as RingConfig,
 
   ground: {
@@ -43,16 +49,24 @@ const GAME_CONFIG = {
   spawning: {
     initial: {
       position: { x: 0, y: 0 },
-      velocity: { magnitude: 100, angle: 0 },
+      velocity: { magnitude: 5, angle: 0 },
       angleRange: { min: Math.PI/4, max: 3*Math.PI/4 }
     },
-    onEscape: {
+    onRingTouch: {
       count: 2,
       position: { x: 0, y: 0 },
-      velocity: { magnitude: 100, angle: 0 },
+      velocity: { magnitude: 5, angle: 0 },
       angleRange: { min: Math.PI/4, max: 3*Math.PI/4 }
     }
-  }
+  },
+
+  killBoundary: {
+    thickness: 1.0,
+    offset: 1.0,
+    debugVisible: true,
+    debugColor: 0xff0000,
+    debugAlpha: 0.5
+  } as KillBoundaryConfig
 } as const;
 
 export class Game {
@@ -61,9 +75,11 @@ export class Game {
   objects: Prefab[] = [];
   balls: Ball[] = [];
   ring!: Ring;
+  killBoundary!: KillBoundary;
   R!: typeof RAPIER;
   debugUI!: DebugUI;
   debugRenderer!: DebugRenderer;
+  totalBallsSpawned: number = 0;
 
   async init(container: HTMLElement) {
     try {
@@ -89,9 +105,24 @@ export class Game {
       this.ring = new Ring(this.world, this.R, GAME_CONFIG.ring);
       this.objects.push(this.ring);
 
-      // Set up escape handler
-      this.ring.setEscapeHandler((escapedBall) => {
-        this.handleBallEscape(escapedBall);
+      // Create kill boundaries
+      this.killBoundary = new KillBoundary(
+        this.world,
+        this.R,
+        GAME_CONFIG.killBoundary,
+        this.app.screen.width,
+        this.app.screen.height
+      );
+      this.objects.push(this.killBoundary);
+
+      // Set up ring touch handler (for spawning)
+      this.ring.setRingTouchHandler((touchedBall) => {
+        this.handleBallRingTouch(touchedBall);
+      });
+
+      // Set up kill boundary handler (for destruction)
+      this.killBoundary.setKillHandler((killedBall) => {
+        this.handleBallKill(killedBall);
       });
 
       // Spawn initial ball
@@ -117,6 +148,7 @@ export class Game {
       velocity
     );
 
+    this.totalBallsSpawned++;
     this.balls.push(ball);
     this.objects.push(ball);
     this.app.stage.addChild(ball.graphic);
@@ -146,30 +178,51 @@ export class Game {
     this.spawnBall(GAME_CONFIG.spawning.initial);
   }
 
-  private spawnEscapeBalls() {
-    for (let i = 0; i < GAME_CONFIG.spawning.onEscape.count; i++) {
-      this.spawnBall(GAME_CONFIG.spawning.onEscape);
+  private spawnRingTouchBalls() {
+    // Check if we're at the ball limit
+    if (this.totalBallsSpawned >= GAME_CONFIG.gameplay.maxBalls) {
+      return;
+    }
+
+    // Calculate how many balls we can spawn without exceeding the limit
+    const ballsToSpawn = Math.min(
+      GAME_CONFIG.spawning.onRingTouch.count,
+      GAME_CONFIG.gameplay.maxBalls - this.totalBallsSpawned
+    );
+
+    for (let i = 0; i < ballsToSpawn; i++) {
+      this.spawnBall(GAME_CONFIG.spawning.onRingTouch);
     }
   }
 
-  private handleBallEscape(escapedBall: RAPIER.RigidBody) {
-    // Remove the escaped ball
-    const escapedIndex = this.balls.findIndex(ball => ball.body.handle === escapedBall.handle);
-    if (escapedIndex !== -1) {
-      const escapedBallPrefab = this.balls[escapedIndex];
-      this.app.stage.removeChild(escapedBallPrefab.graphic);
-      this.balls.splice(escapedIndex, 1);
+  private handleBallRingTouch(touchedBall: RAPIER.RigidBody) {
+    // Ring touch only triggers spawning, not destruction
+    this.spawnRingTouchBalls();
+  }
 
-      const prefabIndex = this.objects.indexOf(escapedBallPrefab);
+  private handleBallKill(killedBall: RAPIER.RigidBody) {
+    const ballHandle = killedBall.handle;
+
+    // Remove the killed ball
+    const killedIndex = this.balls.findIndex(ball => ball.body.handle === killedBall.handle);
+    if (killedIndex !== -1) {
+      const killedBallPrefab = this.balls[killedIndex];
+      this.app.stage.removeChild(killedBallPrefab.graphic);
+      this.balls.splice(killedIndex, 1);
+
+      const prefabIndex = this.objects.indexOf(killedBallPrefab);
       if (prefabIndex !== -1) {
         this.objects.splice(prefabIndex, 1);
       }
     }
 
-    this.world.removeRigidBody(escapedBall);
+    this.world.removeRigidBody(killedBall);
 
-    // Spawn new balls using config
-    this.spawnEscapeBalls();
+    // Clean up the ball handle from ring's touch tracking
+    this.ring.cleanupTouchedBall(ballHandle);
+
+    // Clean up the ball handle from kill boundary tracking
+    this.killBoundary.cleanupKilledBall(ballHandle);
   }
 
   private startLoop() {
@@ -183,11 +236,18 @@ export class Game {
       last = now;
 
       while (acc >= dt) {
-        // Step the ring (spin + event handling)
+        // Step the ring (handle spinning)
         this.ring.step(dt);
 
-        // Step the world with the ring's event queue
+                // Step the world ONCE per frame (maintains correct physics timing)
         this.world.step(this.ring.getEventQueue());
+
+        // Process collision events from the shared event queue
+        this.ring.getEventQueue().drainCollisionEvents((h1, h2, started) => {
+          // Both Ring and KillBoundary check if collision involves their sensors
+          this.ring.processCollisionEvent(h1, h2, started);
+          this.killBoundary.processCollisionEvent(h1, h2, started);
+        });
 
         this.objects.forEach(obj => obj.updateFromPhysics());
         acc -= dt;
@@ -207,6 +267,7 @@ export class Game {
 
       // Update debug info - show ball count instead
       this.debugUI.params.ballCount = this.balls.length;
+      this.debugUI.params.totalSpawned = this.totalBallsSpawned;
       if (this.balls.length > 0) {
         this.debugUI.params.ballY_px = Math.round(m2p(this.balls[0].body.translation().y));
         this.debugUI.params.ballY_m = +this.balls[0].body.translation().y.toFixed(2);

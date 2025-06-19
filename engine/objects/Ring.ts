@@ -5,9 +5,12 @@ import { m2p } from "../scale";
 import type { RingConfig } from "./interfaces";
 
 export class Ring extends Prefab {
-  private sensorCollider!: RAPIER.Collider;
+  /** Array of sensor segment colliders forming a closed ring outside the main ring */
+  private sensorColliders: RAPIER.Collider[] = [];
   private eventQueue!: RAPIER.EventQueue;
-  private onBallEscape?: (escapedBall: RAPIER.RigidBody) => void;
+  private onBallRingTouch?: (touchedBall: RAPIER.RigidBody) => void;
+  /** Track balls that have already triggered ring touch to prevent duplicates */
+  private touchedBallHandles = new Set<number>();
 
   constructor(
     world: RAPIER.World,
@@ -19,8 +22,27 @@ export class Ring extends Prefab {
     this.init();
   }
 
-  setEscapeHandler(handler: (escapedBall: RAPIER.RigidBody) => void) {
-    this.onBallEscape = handler;
+  setRingTouchHandler(handler: (touchedBall: RAPIER.RigidBody) => void) {
+    this.onBallRingTouch = handler;
+  }
+
+  /**
+   * Check if an angle falls within the gap, handling wrap-around at 2π
+   */
+  private isAngleInGap(angle: number, gapStart: number, gapEnd: number): boolean {
+    // Normalize angles to [0, 2π)
+    const normalizeAngle = (a: number) => ((a % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
+
+    const normAngle = normalizeAngle(angle);
+    const normStart = normalizeAngle(gapStart);
+    const normEnd = normalizeAngle(gapEnd);
+
+    // Handle case where gap crosses 0/2π boundary
+    if (normStart > normEnd) {
+      return normAngle >= normStart || normAngle <= normEnd;
+    } else {
+      return normAngle >= normStart && normAngle <= normEnd;
+    }
   }
 
   protected createPhysics() {
@@ -28,16 +50,25 @@ export class Ring extends Prefab {
     this.body = this.world.createRigidBody(
       this.R.RigidBodyDesc.kinematicPositionBased()
         .setTranslation(0, 0)  // Physics coordinates centered at origin
-        .setCcdEnabled(true)  // Enable CCD for rotating ring
+        .setCcdEnabled(true) // CCD enabled by default for all kinematic objects
     );
 
-    // Create cuboid segments
-    const arc = 2 * Math.PI - this.config.gapAngle;
-    const angleStep = arc / this.config.segments;
-    const halfBarLen = (this.config.radius * angleStep) / 2;
+    // Calculate gap boundaries: gap is centered at gapCenterAngle
+    const gapStartAngle = this.config.gapCenterAngle - this.config.gapAngle / 2;
+    const gapEndAngle = this.config.gapCenterAngle + this.config.gapAngle / 2;
+
+    // Create segments distributed around full circle, skipping gap area
+    const totalAngleStep = (2 * Math.PI) / this.config.segments;
+    const halfBarLen = (this.config.radius * totalAngleStep) / 2;
 
     for (let i = 0; i < this.config.segments; ++i) {
-      const midAngle = -this.config.gapAngle / 2 + angleStep * (i + 0.5);
+      const midAngle = totalAngleStep * (i + 0.5);
+
+      // Skip segments that fall within the gap
+      if (this.isAngleInGap(midAngle, gapStartAngle, gapEndAngle)) {
+        continue;
+      }
+
       this.world.createCollider(
         this.R.ColliderDesc.cuboid(halfBarLen, this.config.thickness / 2)
           .setTranslation(
@@ -52,18 +83,28 @@ export class Ring extends Prefab {
       );
     }
 
-    // Create sensor outside the gap
-    const sensorLen = this.config.thickness * 2;
-    const sensorDistance = this.config.radius + this.config.thickness + this.config.sensorOffset;
-    this.sensorCollider = this.world.createCollider(
-      this.R.ColliderDesc.cuboid(sensorLen / 2, this.config.thickness)
-        .setTranslation(sensorDistance, 0)  // Position outside the gap
-        .setSensor(true)
-        .setActiveEvents(this.R.ActiveEvents.COLLISION_EVENTS)
-        .setCollisionGroups(0b10_0001)   // membership 0b10, filter 0b0001
-        .setEnabled(true),
-      this.body
-    );
+    // Create a closed ring of sensor segments (no gap)
+    const sensorRadius = this.config.radius + this.config.thickness + this.config.sensorOffset + this.config.sensorThickness / 2;
+    const sensorAngleStep = (2 * Math.PI) / this.config.segments;
+    const sensorHalfBarLen = (sensorRadius * sensorAngleStep) / 2;
+
+    for (let i = 0; i < this.config.segments; ++i) {
+      const midAngle = sensorAngleStep * (i + 0.5);
+
+      const sensorCollider = this.world.createCollider(
+        this.R.ColliderDesc.cuboid(sensorHalfBarLen, this.config.sensorThickness / 2)
+          .setTranslation(
+            sensorRadius * Math.cos(midAngle),
+            sensorRadius * Math.sin(midAngle)
+          )
+          .setRotation(midAngle)
+          .setSensor(true)
+          .setActiveEvents(this.R.ActiveEvents.COLLISION_EVENTS)
+          .setEnabled(true),
+        this.body
+      );
+      this.sensorColliders.push(sensorCollider);
+    }
 
     // Store spin speed in userData
     this.body.userData = { spinSpeed: this.config.spinSpeed };
@@ -72,13 +113,21 @@ export class Ring extends Prefab {
   protected createGraphics() {
     const g = new PIXI.Graphics();
 
-    // Draw ring segments
-    const arc = 2 * Math.PI - this.config.gapAngle;
-    const angleStep = arc / this.config.segments;
-    const halfBarLen = (this.config.radius * angleStep) / 2;
+    // Draw ring segments (same logic as physics)
+    const gapStartAngle = this.config.gapCenterAngle - this.config.gapAngle / 2;
+    const gapEndAngle = this.config.gapCenterAngle + this.config.gapAngle / 2;
+
+    const totalAngleStep = (2 * Math.PI) / this.config.segments;
+    const halfBarLen = (this.config.radius * totalAngleStep) / 2;
 
     for (let i = 0; i < this.config.segments; ++i) {
-      const midAngle = -this.config.gapAngle / 2 + angleStep * (i + 0.5);
+      const midAngle = totalAngleStep * (i + 0.5);
+
+      // Skip segments that fall within the gap
+      if (this.isAngleInGap(midAngle, gapStartAngle, gapEndAngle)) {
+        continue;
+      }
+
       const x = this.config.radius * Math.cos(midAngle);
       const y = this.config.radius * Math.sin(midAngle);
 
@@ -93,15 +142,25 @@ export class Ring extends Prefab {
       g.addChild(segmentGraphic);
     }
 
-    // Draw sensor (for debugging)
-    const sensorLen = this.config.thickness * 2;
-    const sensorDistance = this.config.radius + this.config.thickness + this.config.sensorOffset;
-    const sensorGraphic = new PIXI.Graphics();
-    sensorGraphic.rect(-m2p(sensorLen / 2), -m2p(this.config.thickness / 2),
-                      m2p(sensorLen), m2p(this.config.thickness));
-    sensorGraphic.fill(0xff0000, 0.3); // Semi-transparent red
-    sensorGraphic.position.set(m2p(sensorDistance), 0);  // Position outside the gap
-    g.addChild(sensorGraphic);
+    // Draw sensor ring (debug)
+    const sensorRadius = this.config.radius + this.config.thickness + this.config.sensorOffset + this.config.sensorThickness / 2;
+    const sensorAngleStep = (2 * Math.PI) / this.config.segments;
+    const sensorHalfBarLen = (sensorRadius * sensorAngleStep) / 2;
+
+    for (let i = 0; i < this.config.segments; ++i) {
+      const midAngle = sensorAngleStep * (i + 0.5);
+      const x = sensorRadius * Math.cos(midAngle);
+      const y = sensorRadius * Math.sin(midAngle);
+
+      const sensorSeg = new PIXI.Graphics();
+      sensorSeg.rect(-m2p(sensorHalfBarLen), -m2p(this.config.sensorThickness / 2),
+                     m2p(sensorHalfBarLen * 2), m2p(this.config.sensorThickness));
+      sensorSeg.fill(0xff0000, 0.2);
+      sensorSeg.position.set(m2p(x), m2p(y));
+      sensorSeg.rotation = midAngle;
+
+      g.addChild(sensorSeg);
+    }
 
     this.graphic = g;
   }
@@ -110,29 +169,46 @@ export class Ring extends Prefab {
     // Spin the ring
     const currentRot = this.body.rotation();
     this.body.setNextKinematicRotation(currentRot + this.config.spinSpeed * fixedStep);
+  }
 
-    // Handle escape events
-    this.eventQueue.drainCollisionEvents((h1, h2, started) => {
-      if (!started) return;
+  processCollisionEvent(h1: number, h2: number, started: boolean) {
+    if (!started) return;
 
-      const c1 = this.world.getCollider(h1);
-      const c2 = this.world.getCollider(h2);
-      if (!c1 || !c2) return;
+    const c1 = this.world.getCollider(h1);
+    const c2 = this.world.getCollider(h2);
+    if (!c1 || !c2) return;
 
-      const sensor = c1.isSensor() ? c1 : c2.isSensor() ? c2 : null;
-      if (!sensor) return;
+    const sensor = c1.isSensor() ? c1 : c2.isSensor() ? c2 : null;
+    if (!sensor) return;
 
-      const ballCollider = sensor === c1 ? c2 : c1;
-      const escapedBall = ballCollider.parent();
-      if (escapedBall === null) return;
+    // Check if the sensor belongs to this ring
+    if (!this.sensorColliders.includes(sensor)) return;
 
-      if (this.onBallEscape) {
-        this.onBallEscape(escapedBall);
-      }
-    });
+    const ballCollider = sensor === c1 ? c2 : c1;
+    const touchedBall = ballCollider.parent();
+    if (touchedBall === null) return;
+
+    // Prevent duplicate processing of the same ball
+    const ballHandle = touchedBall.handle;
+    if (this.touchedBallHandles.has(ballHandle)) {
+      return;
+    }
+
+    this.touchedBallHandles.add(ballHandle);
+
+    if (this.onBallRingTouch) {
+      this.onBallRingTouch(touchedBall);
+    }
   }
 
   getEventQueue(): RAPIER.EventQueue {
     return this.eventQueue;
+  }
+
+  /**
+   * Clean up tracking for a ball that has been removed from the world
+   */
+  cleanupTouchedBall(ballHandle: number) {
+    this.touchedBallHandles.delete(ballHandle);
   }
 }

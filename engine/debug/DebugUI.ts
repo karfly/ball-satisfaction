@@ -11,7 +11,8 @@ export class DebugUI {
     "View graphics": true,
     ballY_px: 0,
     ballY_m: 0,
-    ballCount: 0
+    ballCount: 0,
+    totalSpawned: 0
   };
 
   constructor(private world: RAPIER.World, app: PIXI.Application) {
@@ -22,6 +23,7 @@ export class DebugUI {
     this.gui.add(this.params, "ballY_px").listen();
     this.gui.add(this.params, "ballY_m").listen();
     this.gui.add(this.params, "ballCount").listen();
+    this.gui.add(this.params, "totalSpawned").listen();
   }
 
     destroy() {

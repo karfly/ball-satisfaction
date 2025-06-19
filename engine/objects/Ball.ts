@@ -23,7 +23,7 @@ export class Ball extends Prefab {
     this.body = this.world.createRigidBody(
       this.R.RigidBodyDesc.dynamic()
         .setTranslation(this.spawnX, this.spawnY)
-        .setCcdEnabled(this.config.ccdEnabled)
+        .setCcdEnabled(true) // CCD enabled by default for all dynamic objects
     );
 
     const collider = this.R.ColliderDesc.ball(this.config.radius)
