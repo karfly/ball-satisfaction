@@ -7,6 +7,8 @@ import type { RingConfig } from "./interfaces";
 export class Ring extends Prefab {
   /** Array of sensor segment colliders forming a closed ring outside the main ring */
   private sensorColliders: RAPIER.Collider[] = [];
+  /** Array of corner capsule colliders for rounded gap edges */
+  private cornerColliders: RAPIER.Collider[] = [];
   private eventQueue!: RAPIER.EventQueue;
   private onBallRingTouch?: (touchedBall: RAPIER.RigidBody) => void;
   /** Track balls that have already triggered ring touch to prevent duplicates */
@@ -43,6 +45,52 @@ export class Ring extends Prefab {
     } else {
       return normAngle >= normStart && normAngle <= normEnd;
     }
+  }
+
+  /**
+   * Create rounded corner capsules at the gap edges
+   */
+  private createCornerCapsules(gapStartAngle: number, gapEndAngle: number) {
+    // Get corner radius from config or use default
+    const cornerRadius = this.config.cornerRadius ?? this.config.thickness / 2;
+
+    // Skip if corner radius is too small or disabled
+    if (cornerRadius <= 0) {
+      return;
+    }
+
+    // Capsule half-height spans from inner edge to outer edge of ring
+    const capsuleHalfHeight = this.config.thickness / 4;
+
+    // Create capsule at gap start
+    const startCornerCollider = this.world.createCollider(
+      this.R.ColliderDesc.capsule(capsuleHalfHeight, cornerRadius)
+        .setTranslation(
+          this.config.radius * Math.cos(gapStartAngle),
+          this.config.radius * Math.sin(gapStartAngle)
+        )
+        .setRotation(gapStartAngle) // Tangent to the ring
+        .setFriction(this.config.friction)
+        .setRestitution(this.config.restitution)
+        .setEnabled(true),
+      this.body
+    );
+    this.cornerColliders.push(startCornerCollider);
+
+    // Create capsule at gap end
+    const endCornerCollider = this.world.createCollider(
+      this.R.ColliderDesc.capsule(capsuleHalfHeight, cornerRadius)
+        .setTranslation(
+          this.config.radius * Math.cos(gapEndAngle),
+          this.config.radius * Math.sin(gapEndAngle)
+        )
+        .setRotation(gapEndAngle) // Tangent to the ring
+        .setFriction(this.config.friction)
+        .setRestitution(this.config.restitution)
+        .setEnabled(true),
+      this.body
+    );
+    this.cornerColliders.push(endCornerCollider);
   }
 
   protected createPhysics() {
@@ -106,6 +154,9 @@ export class Ring extends Prefab {
       this.sensorColliders.push(sensorCollider);
     }
 
+    // Create rounded corner capsules at gap edges
+    this.createCornerCapsules(gapStartAngle, gapEndAngle);
+
     // Store spin speed in userData
     this.body.userData = { spinSpeed: this.config.spinSpeed };
   }
@@ -119,11 +170,11 @@ export class Ring extends Prefab {
 
     // Configure stroke so that its centre lies exactly on the physics radius
     g.setStrokeStyle({
-      width: m2p(this.config.thickness),            // Convert thickness to pixels
+      width: m2p(this.config.thickness),
       color: this.config.color,
       cap:   "round",
       join:  "round",
-      alignment: 0.5                                // Centre stroke on the path
+      alignment: 0.5
     });
 
     const radiusPx = m2p(this.config.radius);

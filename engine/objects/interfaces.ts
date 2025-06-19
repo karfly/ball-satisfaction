@@ -18,6 +18,8 @@ export interface RingConfig {
   sensorOffset: number;
   /** Radial thickness (in meters) of the sensor ring */
   sensorThickness: number;
+  /** Radius of the rounded corners at gap edges. If not specified, defaults to thickness/4 */
+  cornerRadius?: number;
 }
 
 export interface BallSpawnConfig {
