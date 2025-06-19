@@ -81,6 +81,7 @@ export class Game {
       this.app = new PIXI.Application();
       await this.app.init({
         resizeTo: window,
+        antialias: true,
         background: 0x333333
       });
       container.appendChild(this.app.canvas);

@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@dimforge/rapier2d-deterministic": "^0.17.3",
+    "@pixi/graphics-smooth": "^1.1.1",
     "dat.gui": "^0.7.9",
     "next": "^15",
     "pixi-stats": "^4.2.0",

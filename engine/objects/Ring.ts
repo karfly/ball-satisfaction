@@ -113,34 +113,25 @@ export class Ring extends Prefab {
   protected createGraphics() {
     const g = new PIXI.Graphics();
 
-    // Draw ring segments (same logic as physics)
+    // Compute gap angles (in radians)
     const gapStartAngle = this.config.gapCenterAngle - this.config.gapAngle / 2;
-    const gapEndAngle = this.config.gapCenterAngle + this.config.gapAngle / 2;
+    const gapEndAngle   = this.config.gapCenterAngle + this.config.gapAngle / 2;
 
-    const totalAngleStep = (2 * Math.PI) / this.config.segments;
-    const halfBarLen = (this.config.radius * totalAngleStep) / 2;
+    // Configure stroke so that its centre lies exactly on the physics radius
+    g.setStrokeStyle({
+      width: m2p(this.config.thickness),            // Convert thickness to pixels
+      color: this.config.color,
+      cap:   "round",
+      join:  "round",
+      alignment: 0.5                                // Centre stroke on the path
+    });
 
-    for (let i = 0; i < this.config.segments; ++i) {
-      const midAngle = totalAngleStep * (i + 0.5);
+    const radiusPx = m2p(this.config.radius);
 
-      // Skip segments that fall within the gap
-      if (this.isAngleInGap(midAngle, gapStartAngle, gapEndAngle)) {
-        continue;
-      }
-
-      const x = this.config.radius * Math.cos(midAngle);
-      const y = this.config.radius * Math.sin(midAngle);
-
-      // Draw each segment as a rectangle
-      const segmentGraphic = new PIXI.Graphics();
-      segmentGraphic.rect(-m2p(halfBarLen), -m2p(this.config.thickness / 2),
-                         m2p(halfBarLen * 2), m2p(this.config.thickness));
-      segmentGraphic.fill(this.config.color);
-      segmentGraphic.position.set(m2p(x), m2p(y));
-      segmentGraphic.rotation = midAngle;
-
-      g.addChild(segmentGraphic);
-    }
+    // Draw the ring as a single arc that wraps around the gap (clockwise)
+    // Example: if gap is from 4.5→4.9 rad, we draw from 4.9 → (4.5+2π) rad.
+    g.arc(0, 0, radiusPx, gapEndAngle, gapStartAngle + 2 * Math.PI);
+    g.stroke();
 
     this.graphic = g;
   }
