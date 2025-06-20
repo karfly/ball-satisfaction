@@ -20,7 +20,14 @@ const GAME_CONFIG = {
     radius: 0.3,
     restitution: 0.9,
     friction: 0.9,
-    color: 0xff3333
+    color: 0xff3333,
+    trail: {
+      enabled: true,
+      maxLength: 10,
+      fadeAlpha: 0.0,
+      width: 1.0,
+      updateInterval: 1.0 // ~60fps trail updates
+    }
   } as BallConfig,
 
   ring: {
@@ -227,6 +234,10 @@ export class Game {
     if (killedIndex !== -1) {
       const killedBallPrefab = this.balls[killedIndex];
       this.app.stage.removeChild(killedBallPrefab.graphic);
+
+      // Cleanup trail before removing ball
+      killedBallPrefab.destroy();
+
       this.balls.splice(killedIndex, 1);
 
       const prefabIndex = this.objects.indexOf(killedBallPrefab);
@@ -275,6 +286,11 @@ export class Game {
       // Handle graphics visibility
       this.objects.forEach(obj => {
         obj.graphic.visible = this.debugUI.params["View graphics"];
+      });
+
+      // Handle trail visibility
+      this.balls.forEach(ball => {
+        ball.setTrailEnabled(this.debugUI.params["Trails enabled"]);
       });
 
       // Handle debug collider rendering

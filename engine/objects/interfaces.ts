@@ -3,6 +3,7 @@ export interface BallConfig {
   restitution: number;
   friction: number;
   color: number;
+  trail: BallTrailConfig;
 }
 
 export interface RingConfig {
@@ -39,4 +40,19 @@ export interface BallSpawnConfig {
 export interface KillBoundaryConfig {
   thickness: number;
   offset: number; // Distance beyond screen edges (in physics units)
+}
+
+export interface BallTrailConfig {
+  enabled: boolean;
+  maxLength: number;      // Number of trail segments
+  fadeAlpha: number;      // Alpha at trail end (0.0-1.0)
+  width: number;          // Trail width multiplier
+  color?: number;         // Override ball color (optional)
+  updateInterval: number; // Milliseconds between trail updates
+}
+
+export interface TrailSegment {
+  x: number;
+  y: number;
+  timestamp: number;
 }

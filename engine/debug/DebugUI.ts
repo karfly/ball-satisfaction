@@ -9,6 +9,7 @@ export class DebugUI {
   params = {
     "View colliders": true,
     "View graphics": true,
+    "Trails enabled": true,
     ballCount: 0,
     totalSpawned: 0,
     escapedBalls: 0,
@@ -41,6 +42,7 @@ export class DebugUI {
 
     this.gui.add(this.params, "View colliders");
     this.gui.add(this.params, "View graphics");
+    this.gui.add(this.params, "Trails enabled");
     this.gui.add(this.params, "ballCount").listen();
     this.gui.add(this.params, "totalSpawned").listen();
     this.gui.add(this.params, "escapedBalls").listen();
