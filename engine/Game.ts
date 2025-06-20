@@ -18,7 +18,9 @@ const GAME_CONFIG = {
   },
 
   gameplay: {
-    maxBalls: 10
+    maxBalls: 10,
+    targetEscapes: 10,
+    timeLimit: 30 // seconds
   },
 
   // Color palette for random ball colors
@@ -120,6 +122,10 @@ export class Game {
   // Game state management
   private gameState: GameState = GameState.LOADING;
   public onGameStateChange?: (state: GameState) => void;
+
+  // Game timer and progress
+  private gameTimer: number = 0;
+  private gameStartTime: number = 0;
 
   async init(container: HTMLElement) {
     try {
@@ -416,8 +422,11 @@ export class Game {
 
   // Public methods for game state management
   public startGame(): void {
-    if (this.gameState === GameState.LOADING) {
+    if (this.gameState === GameState.LOADING || this.gameState === GameState.GAME_OVER || this.gameState === GameState.WIN) {
+      this.resetGame();
       this.gameState = GameState.PLAYING;
+      this.gameStartTime = performance.now();
+      this.gameTimer = GAME_CONFIG.gameplay.timeLimit;
       this.spawnInitialBall();
       this.onGameStateChange?.(this.gameState);
     }
@@ -425,6 +434,62 @@ export class Game {
 
   public getGameState(): GameState {
     return this.gameState;
+  }
+
+  public getGameTimer(): number {
+    return Math.max(0, Math.ceil(this.gameTimer));
+  }
+
+  public getGameProgress(): { escaped: number; target: number } {
+    return {
+      escaped: this.escapedBallsCount,
+      target: GAME_CONFIG.gameplay.targetEscapes
+    };
+  }
+
+  public getGameConfig(): { targetEscapes: number; timeLimit: number } {
+    return {
+      targetEscapes: GAME_CONFIG.gameplay.targetEscapes,
+      timeLimit: GAME_CONFIG.gameplay.timeLimit
+    };
+  }
+
+  private resetGame(): void {
+    // Reset game counters
+    this.totalBallsSpawned = 0;
+    this.escapedBallsCount = 0;
+    this.currentColorIndex = 0;
+    this.gameTimer = 0;
+    this.gameStartTime = 0;
+
+    // Remove all balls
+    this.balls.forEach(ball => {
+      this.app.stage.removeChild(ball.graphic);
+      ball.destroy();
+      this.world.removeRigidBody(ball.body);
+    });
+    this.balls = [];
+
+    // Remove balls from objects array
+    this.objects = this.objects.filter(obj => !(obj instanceof Ball));
+
+    // Clean up ring's tracking
+    this.balls.forEach(ball => {
+      this.ring.cleanupEscapedBall(ball.body.handle);
+      this.killBoundary.cleanupKilledBall(ball.body.handle);
+    });
+  }
+
+  private checkWinCondition(): void {
+    if (this.gameState === GameState.PLAYING) {
+      if (this.escapedBallsCount >= GAME_CONFIG.gameplay.targetEscapes) {
+        this.gameState = GameState.WIN;
+        this.onGameStateChange?.(this.gameState);
+      } else if (this.gameTimer <= 0) {
+        this.gameState = GameState.GAME_OVER;
+        this.onGameStateChange?.(this.gameState);
+      }
+    }
   }
 
   private startLoop() {
@@ -438,6 +503,12 @@ export class Game {
       last = now;
 
       while (acc >= dt) {
+        // Update game timer if playing
+        if (this.gameState === GameState.PLAYING) {
+          this.gameTimer -= dt;
+          this.checkWinCondition();
+        }
+
         // Step the ring (handle spinning)
         this.ring.step(dt);
 
