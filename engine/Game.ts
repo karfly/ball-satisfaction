@@ -14,7 +14,7 @@ const GAME_CONFIG = {
   },
 
   gameplay: {
-    maxBalls: 50
+    maxBalls: 10
   },
 
   // Color palette for random ball colors
@@ -31,8 +31,8 @@ const GAME_CONFIG = {
 
   ball: {
     radius: 0.5,
-    restitution: 0.9,
-    friction: 0.9,
+    restitution: 1.0,
+    friction: 0.1,
     color: 0xff3333,
     trail: {
       enabled: false,
@@ -57,7 +57,7 @@ const GAME_CONFIG = {
     // gapCenterAngle: Math.PI / 2, // Gap center at top (12 o'clock position)
     segments: 256,
     spinSpeed: 1.0,
-    restitution: 0.6,
+    restitution: 0.8,
     friction: 1.0,
     color: 0xFFFFFF,
     escapeSensorOffset: 0.0,
