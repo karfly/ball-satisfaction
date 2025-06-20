@@ -4,6 +4,7 @@ import { Ball, Ring, KillBoundary, Prefab, type BallConfig, type RingConfig, typ
 import { m2p } from "./scale";
 import { DebugUI } from "./debug/DebugUI";
 import { DebugRenderer } from "./debug/DebugRenderer";
+import { ParticleManager } from "./ParticleManager";
 
 // Centralized Game Configuration
 const GAME_CONFIG = {
@@ -67,6 +68,10 @@ const GAME_CONFIG = {
       outerStrength: 1.5,
       color: 0xFFFF00,
       quality: 0.5
+    },
+    particles: {
+      enabled: true,
+      color: 0xFFFFFF // Simple white particles initially
     }
   } as RingConfig,
 
@@ -100,6 +105,7 @@ export class Game {
   R!: typeof RAPIER;
   debugUI!: DebugUI;
   debugRenderer!: DebugRenderer;
+  particleManager!: ParticleManager;
   totalBallsSpawned: number = 0;
   escapedBallsCount: number = 0;
   private currentColorIndex: number = 0;
@@ -142,9 +148,11 @@ export class Game {
 
       this.debugUI = new DebugUI(this.world, this.app);
       this.debugRenderer = new DebugRenderer(this.world, this.app.stage);
+      this.particleManager = new ParticleManager(this.app.stage);
 
       // Create ring arena
       this.ring = new Ring(this.world, this.R, GAME_CONFIG.ring);
+      this.ring.setParticleManager(this.particleManager);
       this.objects.push(this.ring);
 
       // Create kill boundaries
@@ -297,6 +305,9 @@ export class Game {
         // Step the ring (handle spinning)
         this.ring.step(dt);
 
+        // Update particle manager
+        this.particleManager.update(dt);
+
                 // Step the world ONCE per frame (maintains correct physics timing)
         this.world.step(this.ring.getEventQueue());
 
@@ -338,5 +349,6 @@ export class Game {
   destroy() {
     this.app.destroy(true);
     this.debugUI.destroy();
+    this.particleManager.destroy();
   }
 }

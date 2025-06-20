@@ -9,6 +9,7 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@barvynkoa/particle-emitter": "^0.0.1",
     "@dimforge/rapier2d-deterministic": "^0.17.3",
     "dat.gui": "^0.7.9",
     "next": "^15",

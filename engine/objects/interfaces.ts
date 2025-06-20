@@ -37,6 +37,11 @@ export interface RingConfig {
     color: number;
     quality: number;
   };
+  /** Particle effect configuration for ring collisions */
+  particles: {
+    enabled: boolean;
+    color?: number; // Optional - defaults to ball color
+  };
 }
 
 export interface BallSpawnConfig {
