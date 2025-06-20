@@ -6,14 +6,14 @@ import { m2p } from "../scale";
 import type { RingConfig } from "./interfaces";
 
 export class Ring extends Prefab {
-  /** Array of sensor segment colliders forming a closed ring outside the main ring */
-  private sensorColliders: RAPIER.Collider[] = [];
+  /** Array of escape sensor segment colliders forming a closed ring outside the main ring */
+  private escapeSensorColliders: RAPIER.Collider[] = [];
   /** Array of corner capsule colliders for rounded gap edges */
   private cornerColliders: RAPIER.Collider[] = [];
   private eventQueue!: RAPIER.EventQueue;
-  private onBallRingTouch?: (touchedBall: RAPIER.RigidBody) => void;
-  /** Track balls that have already triggered ring touch to prevent duplicates */
-  private touchedBallHandles = new Set<number>();
+  private onBallRingEscape?: (escapedBall: RAPIER.RigidBody) => void;
+  /** Track balls that have already triggered ring escape to prevent duplicates */
+  private escapedBallHandles = new Set<number>();
 
   constructor(
     world: RAPIER.World,
@@ -25,8 +25,8 @@ export class Ring extends Prefab {
     this.init();
   }
 
-  setRingTouchHandler(handler: (touchedBall: RAPIER.RigidBody) => void) {
-    this.onBallRingTouch = handler;
+  setRingEscapeHandler(handler: (escapedBall: RAPIER.RigidBody) => void) {
+    this.onBallRingEscape = handler;
   }
 
   /**
@@ -131,18 +131,18 @@ export class Ring extends Prefab {
       );
     }
 
-    // Create a closed ring of sensor segments (no gap)
-    const sensorRadius = this.config.radius + this.config.thickness + this.config.sensorOffset + this.config.sensorThickness / 2;
-    const sensorAngleStep = (2 * Math.PI) / this.config.segments;
+    // Create a closed ring of escape sensor segments (no gap)
+    const escapeSensorRadius = this.config.radius + this.config.thickness + this.config.escapeSensorOffset + this.config.escapeSensorThickness / 2;
+    const escapeSensorAngleStep = (2 * Math.PI) / this.config.segments;
 
     for (let i = 0; i < this.config.segments; ++i) {
-      const midAngle = sensorAngleStep * (i + 0.5);
+      const midAngle = escapeSensorAngleStep * (i + 0.5);
 
-      const sensorCollider = this.world.createCollider(
-        this.R.ColliderDesc.cuboid(this.config.sensorThickness / 2, this.config.sensorThickness / 2)
+      const escapeSensorCollider = this.world.createCollider(
+        this.R.ColliderDesc.cuboid(this.config.escapeSensorThickness / 2, this.config.escapeSensorThickness / 2)
           .setTranslation(
-            sensorRadius * Math.cos(midAngle),
-            sensorRadius * Math.sin(midAngle)
+            escapeSensorRadius * Math.cos(midAngle),
+            escapeSensorRadius * Math.sin(midAngle)
           )
           .setRotation(midAngle)
           .setSensor(true)
@@ -150,7 +150,7 @@ export class Ring extends Prefab {
           .setEnabled(true),
         this.body
       );
-      this.sensorColliders.push(sensorCollider);
+      this.escapeSensorColliders.push(escapeSensorCollider);
     }
 
     // Create rounded corner capsules at gap edges
@@ -210,26 +210,26 @@ export class Ring extends Prefab {
     const c2 = this.world.getCollider(h2);
     if (!c1 || !c2) return;
 
-    const sensor = c1.isSensor() ? c1 : c2.isSensor() ? c2 : null;
-    if (!sensor) return;
+    const escapeSensor = c1.isSensor() ? c1 : c2.isSensor() ? c2 : null;
+    if (!escapeSensor) return;
 
-    // Check if the sensor belongs to this ring
-    if (!this.sensorColliders.includes(sensor)) return;
+    // Check if the escape sensor belongs to this ring
+    if (!this.escapeSensorColliders.includes(escapeSensor)) return;
 
-    const ballCollider = sensor === c1 ? c2 : c1;
-    const touchedBall = ballCollider.parent();
-    if (touchedBall === null) return;
+    const ballCollider = escapeSensor === c1 ? c2 : c1;
+    const escapedBall = ballCollider.parent();
+    if (escapedBall === null) return;
 
     // Prevent duplicate processing of the same ball
-    const ballHandle = touchedBall.handle;
-    if (this.touchedBallHandles.has(ballHandle)) {
+    const ballHandle = escapedBall.handle;
+    if (this.escapedBallHandles.has(ballHandle)) {
       return;
     }
 
-    this.touchedBallHandles.add(ballHandle);
+    this.escapedBallHandles.add(ballHandle);
 
-    if (this.onBallRingTouch) {
-      this.onBallRingTouch(touchedBall);
+    if (this.onBallRingEscape) {
+      this.onBallRingEscape(escapedBall);
     }
   }
 
@@ -240,7 +240,7 @@ export class Ring extends Prefab {
   /**
    * Clean up tracking for a ball that has been removed from the world
    */
-  cleanupTouchedBall(ballHandle: number) {
-    this.touchedBallHandles.delete(ballHandle);
+  cleanupEscapedBall(ballHandle: number) {
+    this.escapedBallHandles.delete(ballHandle);
   }
 }

@@ -24,9 +24,9 @@ export interface RingConfig {
   restitution: number;
   friction: number;
   color: number;
-  sensorOffset: number;
-  /** Radial thickness (in meters) of the sensor ring */
-  sensorThickness: number;
+  escapeSensorOffset: number;
+  /** Radial thickness (in meters) of the escape sensor ring */
+  escapeSensorThickness: number;
   /** Radius of the rounded corners at gap edges. If not specified, defaults to thickness/4 */
   cornerRadius?: number;
   /** Glow effect configuration */

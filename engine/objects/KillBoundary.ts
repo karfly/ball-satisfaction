@@ -5,7 +5,7 @@ import { m2p, p2m } from "../scale";
 import type { KillBoundaryConfig } from "./interfaces";
 
 export class KillBoundary extends Prefab {
-  private sensorColliders: RAPIER.Collider[] = [];
+  private killSensorColliders: RAPIER.Collider[] = [];
   private onBallKill?: (killedBall: RAPIER.RigidBody) => void;
   private killedBallHandles = new Set<number>();
   private screenDimensions: { width: number; height: number };
@@ -33,10 +33,10 @@ export class KillBoundary extends Prefab {
 
   private recreateBoundaries() {
     // Remove existing colliders
-    this.sensorColliders.forEach(collider => {
+    this.killSensorColliders.forEach(collider => {
       this.world.removeCollider(collider, false);
     });
-    this.sensorColliders = [];
+    this.killSensorColliders = [];
 
     // Remove existing graphics
     this.graphic.removeChildren();
@@ -100,7 +100,7 @@ export class KillBoundary extends Prefab {
           .setEnabled(true),
         this.body
       );
-      this.sensorColliders.push(collider);
+      this.killSensorColliders.push(collider);
     });
   }
 
@@ -116,13 +116,13 @@ export class KillBoundary extends Prefab {
     const c2 = this.world.getCollider(h2);
     if (!c1 || !c2) return;
 
-    const sensor = c1.isSensor() ? c1 : c2.isSensor() ? c2 : null;
-    if (!sensor) return;
+    const killSensor = c1.isSensor() ? c1 : c2.isSensor() ? c2 : null;
+    if (!killSensor) return;
 
-    // Check if the sensor belongs to this kill boundary
-    if (!this.sensorColliders.includes(sensor)) return;
+    // Check if the kill sensor belongs to this kill boundary
+    if (!this.killSensorColliders.includes(killSensor)) return;
 
-    const ballCollider = sensor === c1 ? c2 : c1;
+    const ballCollider = killSensor === c1 ? c2 : c1;
     const killedBall = ballCollider.parent();
     if (killedBall === null) return;
 

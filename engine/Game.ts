@@ -59,8 +59,8 @@ const GAME_CONFIG = {
     restitution: 0.6,
     friction: 1.0,
     color: 0xFFFF00,
-    sensorOffset: 0.0,
-    sensorThickness: 0.5,
+    escapeSensorOffset: 0.0,
+    escapeSensorThickness: 0.5,
     glow: {
       enabled: false,
       distance: 7,
@@ -76,7 +76,7 @@ const GAME_CONFIG = {
       velocity: { magnitude: 5, angle: 0 },
       angleRange: { min: Math.PI/4, max: 3*Math.PI/4 }
     },
-    onRingTouch: {
+    onRingEscape: {
       count: 2,
       position: { x: 0, y: 0 },
       velocity: { magnitude: 5, angle: 0 },
@@ -157,9 +157,9 @@ export class Game {
       );
       this.objects.push(this.killBoundary);
 
-      // Set up ring touch handler (for spawning)
-      this.ring.setRingTouchHandler((touchedBall) => {
-        this.handleBallRingTouch(touchedBall);
+      // Set up ring escape handler (for spawning)
+      this.ring.setRingEscapeHandler((escapedBall) => {
+        this.handleBallRingEscape(escapedBall);
       });
 
       // Set up kill boundary handler (for destruction)
@@ -229,7 +229,7 @@ export class Game {
     this.spawnBall(GAME_CONFIG.spawning.initial);
   }
 
-  private spawnRingTouchBalls() {
+  private spawnRingEscapeBalls() {
     // Check if we're at the ball limit
     if (this.totalBallsSpawned >= GAME_CONFIG.gameplay.maxBalls) {
       return;
@@ -237,21 +237,21 @@ export class Game {
 
     // Calculate how many balls we can spawn without exceeding the limit
     const ballsToSpawn = Math.min(
-      GAME_CONFIG.spawning.onRingTouch.count,
+      GAME_CONFIG.spawning.onRingEscape.count,
       GAME_CONFIG.gameplay.maxBalls - this.totalBallsSpawned
     );
 
     for (let i = 0; i < ballsToSpawn; i++) {
-      this.spawnBall(GAME_CONFIG.spawning.onRingTouch);
+      this.spawnBall(GAME_CONFIG.spawning.onRingEscape);
     }
   }
 
-  private handleBallRingTouch(touchedBall: RAPIER.RigidBody) {
-    // Ring touch means ball escaped through the gap - increment counter
+  private handleBallRingEscape(escapedBall: RAPIER.RigidBody) {
+    // Ring escape means ball escaped through the gap - increment counter
     this.escapedBallsCount++;
 
-    // Ring touch also triggers spawning of new balls
-    this.spawnRingTouchBalls();
+    // Ring escape also triggers spawning of new balls
+    this.spawnRingEscapeBalls();
   }
 
   private handleBallKill(killedBall: RAPIER.RigidBody) {
@@ -276,8 +276,8 @@ export class Game {
 
     this.world.removeRigidBody(killedBall);
 
-    // Clean up the ball handle from ring's touch tracking
-    this.ring.cleanupTouchedBall(ballHandle);
+    // Clean up the ball handle from ring's escape tracking
+    this.ring.cleanupEscapedBall(ballHandle);
 
     // Clean up the ball handle from kill boundary tracking
     this.killBoundary.cleanupKilledBall(ballHandle);
@@ -302,7 +302,7 @@ export class Game {
 
         // Process collision events from the shared event queue
         this.ring.getEventQueue().drainCollisionEvents((h1, h2, started) => {
-          // Both Ring and KillBoundary check if collision involves their sensors
+          // Both Ring and KillBoundary check if collision involves their escape/kill sensors
           this.ring.processCollisionEvent(h1, h2, started);
           this.killBoundary.processCollisionEvent(h1, h2, started);
         });
