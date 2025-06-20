@@ -59,14 +59,14 @@ const GAME_CONFIG = {
     spinSpeed: 1.0,
     restitution: 0.6,
     friction: 1.0,
-    color: 0xFFFF00,
+    color: 0xFFFFFF,
     escapeSensorOffset: 0.0,
     escapeSensorThickness: 0.5,
     glow: {
-      enabled: false,
+      enabled: true,
       distance: 7,
       outerStrength: 1.5,
-      color: 0xFFFF00,
+      color: 0xFFFFFF,
       quality: 0.5
     },
     particles: {

@@ -58,13 +58,12 @@ export class ParticleManager {
         particleConfig = {
           lifetime: {
             min: 1.0,
-            max: 3.0  // Medium lifetime for dust settling
+            max: 2.0  // Medium lifetime for dust settling
           },
           frequency: 0.008,
-          spawnChance: 1,
+          spawnChance: 0.3,
           particlesPerWave: 15,  // Moderate particle count
           emitterLifetime: -1,
-          maxParticles: 50,
           pos: { x: 0, y: 0 },
           addAtBack: false,
           behaviors: [
@@ -73,8 +72,9 @@ export class ParticleManager {
               config: {
                 alpha: {
                   list: [
-                    { value: 0.8, time: 0 },    // Start semi-transparent
-                    { value: 0.0, time: 1 }     // Fade to transparent
+                    { value: 1.0, time: 0 },    // Start semi-transparent
+                    { value: 0.0, time: 0.5 },     // Fade to transparent
+                    { value: 0.0, time: 1.0 }     // Fade to transparent
                   ]
                 }
               }
@@ -108,8 +108,8 @@ export class ParticleManager {
                 speed: {
                   list: [
                     { value: 60, time: 0 },   // Initial outward velocity
-                    { value: 30, time: 0.3 }, // Slow down due to air resistance
-                    { value: 15, time: 1 }    // Terminal velocity
+                    { value: 20, time: 0.3 }, // Slow down due to air resistance
+                    { value: 20, time: 1 }    // Terminal velocity
                   ],
                   isStepped: false
                 }
@@ -120,17 +120,6 @@ export class ParticleManager {
               config: {
                 min: 0,
                 max: 360
-              }
-            },
-            {
-              type: 'spawnShape',
-              config: {
-                type: 'torus',
-                data: {
-                  x: 0,
-                  y: 0,
-                  radius: 12  // Slightly larger initial spread
-                }
               }
             },
             {

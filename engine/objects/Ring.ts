@@ -292,31 +292,25 @@ export class Ring extends Prefab {
     // Update emission time
     this.lastParticleEmissionTime.set(ballHandle, this.currentPhysicsTime);
 
-    // ROBUST COORDINATE DEBUGGING APPROACH
+    // Calculate particle emission point at center of ring wall
     const ringBodyPos = this.body.translation(); // Should be (0,0)
-    const ringRotation = this.body.rotation();
-    const colliderLocalPos = ringCollider.translation();
     const ballPos = ballCollider.parent()?.translation();
 
-    // Calculate world position using ring body position + rotated collider position
-    const cos = Math.cos(ringRotation);
-    const sin = Math.sin(ringRotation);
-    const rotatedColliderX = colliderLocalPos.x * cos - colliderLocalPos.y * sin;
-    const rotatedColliderY = colliderLocalPos.x * sin + colliderLocalPos.y * cos;
-    const worldX = ringBodyPos.x + rotatedColliderX;
-    const worldY = ringBodyPos.y + rotatedColliderY;
+    if (!ballPos) return; // Can't calculate without ball position
 
-    // Use ball position as collision point (more accurate than collider center)
-    const actualCollisionX = ballPos ? ballPos.x : worldX;
-    const actualCollisionY = ballPos ? ballPos.y : worldY;
+    // Calculate angle from ring center to ball collision point
+    const collisionAngle = Math.atan2(ballPos.y - ringBodyPos.y, ballPos.x - ringBodyPos.x);
 
-    // Emit particles at the ball's position (most accurate collision point)
+    // Emit particles at the center of the ring wall (ring radius distance from center)
+    const actualCollisionX = ringBodyPos.x + this.config.radius * Math.cos(collisionAngle);
+    const actualCollisionY = ringBodyPos.y + this.config.radius * Math.sin(collisionAngle);
+
+    // Emit particles at the center of the ring wall
     if (this.config.particles.enabled && this.particleManager) {
       // Get ball velocity for collision information
       const ballVelocity = collidedBall.linvel();
-      const collisionAngle = Math.atan2(actualCollisionY - ringBodyPos.y, actualCollisionX - ringBodyPos.x);
       const velocityMagnitude = Math.sqrt(ballVelocity.x * ballVelocity.x + ballVelocity.y * ballVelocity.y);
-      const intensity = Math.min(1.0, velocityMagnitude / 10.0); // Normalize to 0-1 based on velocity
+      const intensity = Math.min(1.0, velocityMagnitude / 5.0); // Normalize to 0-1 based on velocity
 
       // Emit dust-fall effect
       const ballColor = this.config.particles.color || (ballCollider.parent()?.userData as any)?.color;
