@@ -36,7 +36,7 @@ const GAME_CONFIG = {
     trail: {
       enabled: true,
       maxLength: 10,
-      fadeAlpha: 0.0,
+      fadeAlpha: 0.05,
       width: 1.0,
       updateInterval: 1.0 // ~60fps trail updates
     }

@@ -110,7 +110,9 @@ export class Ball extends Prefab {
 
       // Calculate fade based on position in trail (newer = more opaque)
       const progress = i / this.trailHistory.length;
-      const alpha = this.config.trail.fadeAlpha + (1 - this.config.trail.fadeAlpha) * progress;
+      // Non-linear fade - quadratic curve makes tail fade faster
+      const fadeProgress = progress ** 3;
+      const alpha = this.config.trail.fadeAlpha + ((1 - this.config.trail.fadeAlpha)) * fadeProgress;
 
       // Calculate width tapering - start wide and taper to thin
       // progress = 1 (newest) should have max width, progress = 0 (oldest) should have min width
