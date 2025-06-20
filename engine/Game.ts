@@ -13,26 +13,26 @@ const GAME_CONFIG = {
   },
 
   gameplay: {
-    maxBalls: 100
+    maxBalls: 64
   },
 
   ball: {
-    radius: 0.25,
+    radius: 0.3,
     restitution: 0.9,
-    friction: 0.1,
+    friction: 0.9,
     color: 0xff3333
   } as BallConfig,
 
   ring: {
     radius: 5.5,
     thickness: 0.3,
-    gapAngle: Math.PI / 8.0, // 15 degrees
+    gapAngle: Math.PI / 6.0, // 15 degrees
     gapCenterAngle: 3/2 * Math.PI, // Gap center at top (12 o'clock position)
     // gapCenterAngle: Math.PI / 2, // Gap center at top (12 o'clock position)
     segments: 256,
-    spinSpeed: 0.5,
-    restitution: 0.9,
-    friction: 0.9,
+    spinSpeed: 1.0,
+    restitution: 0.6,
+    friction: 1.0,
     color: 0x00ffff,
     sensorOffset: 0.0,
     sensorThickness: 0.5
