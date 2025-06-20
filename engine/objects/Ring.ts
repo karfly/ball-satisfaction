@@ -1,5 +1,6 @@
 import * as PIXI from "pixi.js";
 import type RAPIER from "@dimforge/rapier2d-deterministic";
+import { GlowFilter } from 'pixi-filters';
 import { Prefab } from "./Prefab";
 import { m2p } from "../scale";
 import type { RingConfig } from "./interfaces";
@@ -181,6 +182,17 @@ export class Ring extends Prefab {
     // Example: if gap is from 4.5→4.9 rad, we draw from 4.9 → (4.5+2π) rad.
     g.arc(0, 0, radiusPx, gapEndAngle, gapStartAngle + 2 * Math.PI);
     g.stroke();
+
+    // Apply glow effect if enabled
+    if (this.config.glow.enabled) {
+      const glowFilter = new GlowFilter({
+        distance: this.config.glow.distance,
+        outerStrength: this.config.glow.outerStrength,
+        color: this.config.glow.color,
+        quality: this.config.glow.quality
+      });
+      g.filters = [glowFilter];
+    }
 
     this.graphic = g;
   }

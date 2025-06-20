@@ -12,6 +12,7 @@
     "@dimforge/rapier2d-deterministic": "^0.17.3",
     "dat.gui": "^0.7.9",
     "next": "^15",
+    "pixi-filters": "^6.1.3",
     "pixi-stats": "^4.2.0",
     "pixi.js": "^8",
     "react": "^18",

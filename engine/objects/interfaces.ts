@@ -20,6 +20,14 @@ export interface RingConfig {
   sensorThickness: number;
   /** Radius of the rounded corners at gap edges. If not specified, defaults to thickness/4 */
   cornerRadius?: number;
+  /** Glow effect configuration */
+  glow: {
+    enabled: boolean;
+    distance: number;
+    outerStrength: number;
+    color: number;
+    quality: number;
+  };
 }
 
 export interface BallSpawnConfig {

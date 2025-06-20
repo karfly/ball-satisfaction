@@ -33,9 +33,16 @@ const GAME_CONFIG = {
     spinSpeed: 1.0,
     restitution: 0.6,
     friction: 1.0,
-    color: 0x00ffff,
+    color: 0xFFFF00,
     sensorOffset: 0.0,
-    sensorThickness: 0.5
+    sensorThickness: 0.5,
+    glow: {
+      enabled: true,
+      distance: 7,
+      outerStrength: 1.5,
+      color: 0xFFFF00,
+      quality: 0.5
+    }
   } as RingConfig,
 
   spawning: {
