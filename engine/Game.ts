@@ -18,14 +18,14 @@ const GAME_CONFIG = {
 
   // Color palette for random ball colors
   ballColors: [
-    0xff3333, // Red
-    0x33ff33, // Green
-    0x3333ff, // Blue
-    0xffff33, // Yellow
-    0xff33ff, // Magenta
-    0x33ffff, // Cyan
-    0xff8833, // Orange
-    0x8833ff  // Purple
+    0xFF3333,
+    0x33ff33,
+    0x3333ff,
+    0xA8F8FF,
+    0xFF33F1,
+    0x0B7575,
+    0xff8833,
+    0x8833ff
   ],
 
   ball: {
