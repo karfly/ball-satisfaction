@@ -88,6 +88,22 @@ export class Game {
       });
       container.appendChild(this.app.canvas);
 
+      // Log renderer type for debugging
+      const gl = (this.app.renderer as any).gl;
+      let rendererType = 'Unknown';
+      if (this.app.renderer.type === PIXI.RendererType.WEBGL) {
+        if (gl && gl.constructor.name === 'WebGL2RenderingContext') {
+          rendererType = 'WebGL2';
+        } else if (gl && gl.constructor.name === 'WebGLRenderingContext') {
+          rendererType = 'WebGL1';
+        } else {
+          rendererType = 'WebGL (Unknown Version)';
+        }
+      } else {
+        rendererType = 'Canvas/Other';
+      }
+      console.log(`PixiJS Renderer: ${rendererType}`);
+
       // Center the stage so (0,0) physics coordinates appear at screen center
       this.app.stage.position.set(this.app.screen.width / 2, this.app.screen.height / 2);
 
