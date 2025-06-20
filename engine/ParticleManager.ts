@@ -58,13 +58,13 @@ export class ParticleManager {
         particleConfig = {
           lifetime: {
             min: 1.0,
-            max: 2.0  // Medium lifetime for dust settling
+            max: 3.0  // Medium lifetime for dust settling
           },
           frequency: 0.008,
           spawnChance: 1,
           particlesPerWave: 15,  // Moderate particle count
           emitterLifetime: -1,
-          maxParticles: 200,
+          maxParticles: 50,
           pos: { x: 0, y: 0 },
           addAtBack: false,
           behaviors: [
@@ -96,7 +96,7 @@ export class ParticleManager {
               config: {
                 accel: {
                   x: 0,
-                  y: 120  // Gravity-like downward acceleration
+                  y: 200  // Gravity-like downward acceleration
                 },
                 minStart: 0,
                 maxStart: 0
