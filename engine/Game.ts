@@ -35,10 +35,16 @@ const GAME_CONFIG = {
     color: 0xff3333,
     trail: {
       enabled: true,
-      maxLength: 10,
-      fadeAlpha: 0.05,
+      maxLength: 7,
+      fadeAlpha: 0.0,
       width: 1.0,
       updateInterval: 1.0 // ~60fps trail updates
+    },
+    glow: {
+      enabled: true,
+      distance: 10,
+      outerStrength: 1.2,
+      quality: 0.5
     }
   } as BallConfig,
 
@@ -56,7 +62,7 @@ const GAME_CONFIG = {
     sensorOffset: 0.0,
     sensorThickness: 0.5,
     glow: {
-      enabled: true,
+      enabled: false,
       distance: 7,
       outerStrength: 1.5,
       color: 0xFFFF00,

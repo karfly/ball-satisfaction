@@ -4,6 +4,14 @@ export interface BallConfig {
   friction: number;
   color: number;
   trail: BallTrailConfig;
+  /** Glow effect configuration */
+  glow: {
+    enabled: boolean;
+    distance: number;
+    outerStrength: number;
+    color?: number; // Optional - defaults to ball color if not specified
+    quality: number;
+  };
 }
 
 export interface RingConfig {

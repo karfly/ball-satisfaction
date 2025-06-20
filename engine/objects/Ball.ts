@@ -1,5 +1,6 @@
 import * as PIXI from "pixi.js";
 import type RAPIER from "@dimforge/rapier2d-deterministic";
+import { GlowFilter } from 'pixi-filters';
 import { Prefab } from "./Prefab";
 import { m2p } from "../scale";
 import type { BallConfig, TrailSegment } from "./interfaces";
@@ -43,6 +44,17 @@ export class Ball extends Prefab {
     // Create the ball graphic (this will be rotated)
     this.ballGraphic.circle(0, 0, m2p(this.config.radius));
     this.ballGraphic.fill(this.config.color);
+
+    // Apply glow effect if enabled
+    if (this.config.glow.enabled) {
+      const glowFilter = new GlowFilter({
+        distance: this.config.glow.distance,
+        outerStrength: this.config.glow.outerStrength,
+        color: this.config.glow.color ?? this.config.color, // Use ball color if glow color not specified
+        quality: this.config.glow.quality
+      });
+      this.ballGraphic.filters = [glowFilter];
+    }
 
     // Create container to hold both trail and ball
     const container = new PIXI.Container();
