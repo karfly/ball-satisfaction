@@ -16,6 +16,18 @@ const GAME_CONFIG = {
     maxBalls: 64
   },
 
+  // Color palette for random ball colors
+  ballColors: [
+    0xff3333, // Red
+    0x33ff33, // Green
+    0x3333ff, // Blue
+    0xffff33, // Yellow
+    0xff33ff, // Magenta
+    0x33ffff, // Cyan
+    0xff8833, // Orange
+    0x8833ff  // Purple
+  ],
+
   ball: {
     radius: 0.3,
     restitution: 0.9,
@@ -84,6 +96,7 @@ export class Game {
   debugRenderer!: DebugRenderer;
   totalBallsSpawned: number = 0;
   escapedBallsCount: number = 0;
+  private currentColorIndex: number = 0;
 
   async init(container: HTMLElement) {
     try {
@@ -162,10 +175,19 @@ export class Game {
   private spawnBall(spawnConfig: BallSpawnConfig): Ball {
     const velocity = this.calculateVelocity(spawnConfig);
 
+    // Create ball config with next color in rotation
+    const selectedColor = GAME_CONFIG.ballColors[this.currentColorIndex];
+    this.currentColorIndex = (this.currentColorIndex + 1) % GAME_CONFIG.ballColors.length;
+
+    const ballConfig: BallConfig = {
+      ...GAME_CONFIG.ball,
+      color: selectedColor
+    };
+
     const ball = new Ball(
       this.world,
       this.R,
-      GAME_CONFIG.ball,
+      ballConfig,
       spawnConfig.position.x,
       spawnConfig.position.y,
       velocity
