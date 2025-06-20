@@ -8,9 +8,8 @@ export class DebugUI {
   gui = new GUI();
   stats: Stats;
   params = {
-    "View colliders": true,
+    "View colliders": false,
     "View graphics": true,
-    "Trails enabled": true,
     ballCount: 0,
     totalSpawned: 0,
     escapedBalls: 0,
@@ -50,7 +49,6 @@ export class DebugUI {
     // Basic controls
     this.gui.add(this.params, "View colliders");
     this.gui.add(this.params, "View graphics");
-    this.gui.add(this.params, "Trails enabled");
 
     // Game stats folder
     const gameFolder = this.gui.addFolder("Game Stats");

@@ -10,11 +10,11 @@ import { ParticleManager } from "./ParticleManager";
 const GAME_CONFIG = {
   physics: {
     gravity: { x: 0, y: 20 },
-    fixedDt: 1/60
+    fixedDt: 1/120
   },
 
   gameplay: {
-    maxBalls: 64
+    maxBalls: 50
   },
 
   // Color palette for random ball colors
@@ -30,19 +30,19 @@ const GAME_CONFIG = {
   ],
 
   ball: {
-    radius: 0.3,
+    radius: 0.5,
     restitution: 0.9,
     friction: 0.9,
     color: 0xff3333,
     trail: {
-      enabled: true,
+      enabled: false,
       maxLength: 7,
       fadeAlpha: 0.0,
       width: 1.0,
       updateInterval: 1.0 // ~60fps trail updates
     },
     glow: {
-      enabled: true,
+      enabled: false,
       distance: 10,
       outerStrength: 1.2,
       quality: 0.5
@@ -63,7 +63,7 @@ const GAME_CONFIG = {
     escapeSensorOffset: 0.0,
     escapeSensorThickness: 0.5,
     glow: {
-      enabled: true,
+      enabled: false,
       distance: 7,
       outerStrength: 1.5,
       color: 0xFFFFFF,
@@ -73,7 +73,7 @@ const GAME_CONFIG = {
       enabled: true,
       color: 0xffffff, // Uncomment to use fixed dust color, comment out to use ball color
       dustIntensity: 1.0, // Normal dust intensity
-      cooldownDuration: 0.01 // Cooldown duration for particle emission
+      cooldownDuration: 0.1 // Cooldown duration for particle emission
     }
   } as RingConfig,
 
@@ -437,10 +437,7 @@ export class Game {
         obj.graphic.visible = this.debugUI.params["View graphics"];
       });
 
-      // Handle trail visibility
-      this.balls.forEach(ball => {
-        ball.setTrailEnabled(this.debugUI.params["Trails enabled"]);
-      });
+
 
       // Handle debug collider rendering
       if (this.debugUI.params["View colliders"]) {

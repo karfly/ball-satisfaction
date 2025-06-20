@@ -1,5 +1,11 @@
 # Ball Satisfaction
 
+# Local dev
+``bash
+ipconfig getifaddr en0  # get ip
+http://{ip}:3000 on mobile
+```
+
 A deterministic 2D physics demo built with Next.js (Pages Router), PixiJS 8, and @dimforge/rapier2d-deterministic.
 
 ## Features
