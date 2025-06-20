@@ -5,6 +5,7 @@ import { m2p, scaleManager } from "./scale";
 import { DebugUI } from "./debug/DebugUI";
 import { DebugRenderer } from "./debug/DebugRenderer";
 import { ParticleManager } from "./ParticleManager";
+import { GameState } from "../types/GameState";
 
 // Centralized Game Configuration
 const GAME_CONFIG = {
@@ -116,6 +117,10 @@ export class Game {
   private currentColorIndex: number = 0;
   private resizeHandler!: () => void;
 
+  // Game state management
+  private gameState: GameState = GameState.LOADING;
+  public onGameStateChange?: (state: GameState) => void;
+
   async init(container: HTMLElement) {
     try {
       this.R = await import("@dimforge/rapier2d-deterministic");
@@ -189,8 +194,7 @@ export class Game {
         this.handleBallKill(killedBall);
       });
 
-      // Spawn initial ball
-      this.spawnInitialBall();
+      // Don't spawn initial ball automatically - wait for startGame() to be called
 
       this.objects.forEach(obj => this.app.stage.addChild(obj.graphic));
 
@@ -408,6 +412,19 @@ export class Game {
 
     // Clean up the ball handle from kill boundary tracking
     this.killBoundary.cleanupKilledBall(ballHandle);
+  }
+
+  // Public methods for game state management
+  public startGame(): void {
+    if (this.gameState === GameState.LOADING) {
+      this.gameState = GameState.PLAYING;
+      this.spawnInitialBall();
+      this.onGameStateChange?.(this.gameState);
+    }
+  }
+
+  public getGameState(): GameState {
+    return this.gameState;
   }
 
   private startLoop() {
