@@ -72,7 +72,8 @@ const GAME_CONFIG = {
     particles: {
       enabled: true,
       color: 0xffffff, // Uncomment to use fixed dust color, comment out to use ball color
-      dustIntensity: 1.0 // Normal dust intensity
+      dustIntensity: 1.0, // Normal dust intensity
+      cooldownDuration: 0.01 // Cooldown duration for particle emission
     }
   } as RingConfig,
 

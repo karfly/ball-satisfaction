@@ -13,14 +13,18 @@ export class Ring extends Prefab {
   private cornerColliders: RAPIER.Collider[] = [];
   /** Array of physical ring segment colliders */
   private ringColliders: RAPIER.Collider[] = [];
+  /** Map for O(1) ring collider lookup by handle */
+  private ringColliderMap = new Map<number, RAPIER.Collider>();
   private eventQueue!: RAPIER.EventQueue;
   private onBallRingEscape?: (escapedBall: RAPIER.RigidBody) => void;
   /** Track balls that have already triggered ring escape to prevent duplicates */
   private escapedBallHandles = new Set<number>();
-  /** Track balls that have already triggered ring collision particles to prevent duplicates */
-  private particleCollisionHandles = new Set<number>();
+  /** Track last particle emission time per ball (ballHandle -> timestamp) */
+  private lastParticleEmissionTime = new Map<number, number>();
   /** Reference to the independent particle manager */
   private particleManager?: ParticleManager;
+  /** Current physics time for collision tracking */
+  private currentPhysicsTime: number = 0;
 
   constructor(
     world: RAPIER.World,
@@ -84,10 +88,12 @@ export class Ring extends Prefab {
         .setRotation(gapStartAngle) // Tangent to the ring
         .setFriction(this.config.friction)
         .setRestitution(this.config.restitution)
+        .setActiveEvents(this.R.ActiveEvents.COLLISION_EVENTS)
         .setEnabled(true),
       this.body
     );
     this.cornerColliders.push(startCornerCollider);
+    this.ringColliderMap.set(startCornerCollider.handle, startCornerCollider);
 
     // Create capsule at gap end
     const endCornerCollider = this.world.createCollider(
@@ -99,10 +105,12 @@ export class Ring extends Prefab {
         .setRotation(gapEndAngle) // Tangent to the ring
         .setFriction(this.config.friction)
         .setRestitution(this.config.restitution)
+        .setActiveEvents(this.R.ActiveEvents.COLLISION_EVENTS)
         .setEnabled(true),
       this.body
     );
     this.cornerColliders.push(endCornerCollider);
+    this.ringColliderMap.set(endCornerCollider.handle, endCornerCollider);
   }
 
   protected createPhysics() {
@@ -142,6 +150,7 @@ export class Ring extends Prefab {
         this.body
       );
       this.ringColliders.push(ringCollider);
+      this.ringColliderMap.set(ringCollider.handle, ringCollider);
     }
 
     // Create a closed ring of escape sensor segments (no gap)
@@ -210,9 +219,16 @@ export class Ring extends Prefab {
     this.graphic = g;
   }
 
-
-
     step(fixedStep: number) {
+    // Update physics time for collision tracking
+    this.currentPhysicsTime += fixedStep;
+
+    // Periodic cleanup of old emission timestamps (every 10 seconds)
+    if (Math.floor(this.currentPhysicsTime) % 10 === 0 &&
+        this.currentPhysicsTime - Math.floor(this.currentPhysicsTime) < fixedStep) {
+      this.cleanupOldEmissionTimes();
+    }
+
     // Spin the ring
     const currentRot = this.body.rotation();
     this.body.setNextKinematicRotation(currentRot + this.config.spinSpeed * fixedStep);
@@ -232,10 +248,10 @@ export class Ring extends Prefab {
       return;
     }
 
-    // Check for physical ring collision (ball hitting ring)
-    const ringCollider = this.ringColliders.includes(c1) ? c1 : this.ringColliders.includes(c2) ? c2 : null;
+    // Check for physical ring collision (ball hitting ring) - O(1) lookup
+    const ringCollider = this.ringColliderMap.get(h1) || this.ringColliderMap.get(h2);
     if (ringCollider) {
-      const ballCollider = ringCollider === c1 ? c2 : c1;
+      const ballCollider = ringCollider.handle === h1 ? c2 : c1;
       this.handleRingCollision(ballCollider, ringCollider);
     }
   }
@@ -257,17 +273,24 @@ export class Ring extends Prefab {
     }
   }
 
-    private handleRingCollision(ballCollider: RAPIER.Collider, ringCollider: RAPIER.Collider) {
+  private handleRingCollision(ballCollider: RAPIER.Collider, ringCollider: RAPIER.Collider) {
     const collidedBall = ballCollider.parent();
     if (collidedBall === null) return;
 
-    // Prevent duplicate processing of the same ball for particles
+    // Get cooldown duration from config (default 0.25 seconds - much shorter than before)
+    const cooldownDuration = this.config.particles?.cooldownDuration ?? 0.25;
+
+    // Check time-based cooldown per ball
     const ballHandle = collidedBall.handle;
-    if (this.particleCollisionHandles.has(ballHandle)) {
-      return;
+    const lastEmissionTime = this.lastParticleEmissionTime.get(ballHandle);
+
+    if (lastEmissionTime !== undefined &&
+        (this.currentPhysicsTime - lastEmissionTime) < cooldownDuration) {
+      return; // Still in cooldown period
     }
 
-    this.particleCollisionHandles.add(ballHandle);
+    // Update emission time
+    this.lastParticleEmissionTime.set(ballHandle, this.currentPhysicsTime);
 
     // ROBUST COORDINATE DEBUGGING APPROACH
     const ringBodyPos = this.body.translation(); // Should be (0,0)
@@ -287,8 +310,6 @@ export class Ring extends Prefab {
     const actualCollisionX = ballPos ? ballPos.x : worldX;
     const actualCollisionY = ballPos ? ballPos.y : worldY;
 
-
-
     // Emit particles at the ball's position (most accurate collision point)
     if (this.config.particles.enabled && this.particleManager) {
       // Get ball velocity for collision information
@@ -297,7 +318,7 @@ export class Ring extends Prefab {
       const velocityMagnitude = Math.sqrt(ballVelocity.x * ballVelocity.x + ballVelocity.y * ballVelocity.y);
       const intensity = Math.min(1.0, velocityMagnitude / 10.0); // Normalize to 0-1 based on velocity
 
-            // Emit dust-fall effect
+      // Emit dust-fall effect
       const ballColor = this.config.particles.color || (ballCollider.parent()?.userData as any)?.color;
       this.particleManager.emitParticlesAt('dust-fall', actualCollisionX, actualCollisionY, {
         angle: collisionAngle,
@@ -306,17 +327,29 @@ export class Ring extends Prefab {
         ballColor: ballColor
       });
     }
-
-    // Clean up collision tracking after a short delay to allow re-collision
-    setTimeout(() => {
-      this.particleCollisionHandles.delete(ballHandle);
-    }, 500);
   }
-
-
 
   getEventQueue(): RAPIER.EventQueue {
     return this.eventQueue;
+  }
+
+    /**
+   * Clean up old emission timestamps to prevent memory leaks
+   */
+  private cleanupOldEmissionTimes() {
+    const maxAge = 5.0; // Keep timestamps for last 5 seconds
+    const cutoffTime = this.currentPhysicsTime - maxAge;
+
+    const keysToDelete: number[] = [];
+    this.lastParticleEmissionTime.forEach((timestamp, ballHandle) => {
+      if (timestamp < cutoffTime) {
+        keysToDelete.push(ballHandle);
+      }
+    });
+
+    keysToDelete.forEach(ballHandle => {
+      this.lastParticleEmissionTime.delete(ballHandle);
+    });
   }
 
   /**
@@ -324,5 +357,7 @@ export class Ring extends Prefab {
    */
   cleanupEscapedBall(ballHandle: number) {
     this.escapedBallHandles.delete(ballHandle);
+    // Also clean up particle emission tracking
+    this.lastParticleEmissionTime.delete(ballHandle);
   }
 }

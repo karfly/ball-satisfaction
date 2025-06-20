@@ -42,6 +42,7 @@ export interface RingConfig {
     enabled: boolean;
     color?: number; // Optional - if set, use this color; if not set, use ball color
     dustIntensity?: number; // Dust particle count multiplier (0.5-2.0)
+    cooldownDuration?: number; // Time in seconds between particle emissions per ball (default: 0.25)
   };
 }
 
