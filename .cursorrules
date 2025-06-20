@@ -5,7 +5,6 @@ Project: Deterministic 2-D physics demo using Next.js (Pages Router), PixiJS 8, 
 - If you want to check the code on runtime, you can use the browser-tools tool with getConsoleErrors command
 - Use port 3000 for development server
 - While debugging it's useful to use console.log() and then checkt logs browser-tools tool with getConsoleLogs command. But make sure to clean it up after you're done.
-- If you change something that can change visually change the page (physics based objects too) - you can use browser-tools tool with takeScreenshot command
 - Always write TypeScript (strict mode on).
 - Step Rapier with a fixed 1/60 s accumulator; NEVER use variable-dt.
 - Put rendering, physics, and loop in `engine/`; React components only host the canvas.

@@ -47,9 +47,9 @@ export default function GameCanvas() {
   };
 
   return (
-    <div style={{ width: "100%", height: "100%", position: "relative" }}>
-      <div ref={host} style={{ width: "100%", height: "100%" }} />
-            <GameUI
+    <div className="w-full h-full relative">
+      <div ref={host} className="w-full h-full" />
+      <GameUI
         gameState={gameState}
         onStartGame={handleStartGame}
         gameTimer={gameTimer}

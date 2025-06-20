@@ -4,7 +4,7 @@ const GameCanvas = dynamic(() => import("../components/GameCanvas"), { ssr: fals
 
 export default function Home() {
   return (
-    <div style={{width:"100vw", height:"100vh", margin:0}}>
+    <div className="w-screen h-screen m-0 relative">
       <GameCanvas />
     </div>
   );
