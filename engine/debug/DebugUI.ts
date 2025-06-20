@@ -2,6 +2,7 @@ import * as PIXI from "pixi.js";
 import type RAPIER from "@dimforge/rapier2d-deterministic";
 import { GUI } from "dat.gui";
 import { Stats } from "pixi-stats";
+import { scaleManager } from "../scale";
 
 export class DebugUI {
   gui = new GUI();
@@ -13,7 +14,10 @@ export class DebugUI {
     ballCount: 0,
     totalSpawned: 0,
     escapedBalls: 0,
-    rendererType: "Unknown"
+    rendererType: "Unknown",
+    currentPPM: 50,
+    screenDimensions: "0x0",
+    ringTargetSize: "0px"
   };
 
   constructor(private world: RAPIER.World, app: PIXI.Application) {
@@ -22,6 +26,9 @@ export class DebugUI {
     // Detect renderer type
     const rendererType = this.getRendererType(app.renderer);
     this.params.rendererType = rendererType;
+
+    // Initialize scaling info
+    this.updateScalingInfo(app);
 
     // Add required CSS styling for stats display
     const style = document.createElement('style');
@@ -40,13 +47,51 @@ export class DebugUI {
     `;
     document.head.appendChild(style);
 
+    // Basic controls
     this.gui.add(this.params, "View colliders");
     this.gui.add(this.params, "View graphics");
     this.gui.add(this.params, "Trails enabled");
-    this.gui.add(this.params, "ballCount").listen();
-    this.gui.add(this.params, "totalSpawned").listen();
-    this.gui.add(this.params, "escapedBalls").listen();
-    this.gui.add(this.params, "rendererType").listen();
+
+    // Game stats folder
+    const gameFolder = this.gui.addFolder("Game Stats");
+    gameFolder.add(this.params, "ballCount").listen();
+    gameFolder.add(this.params, "totalSpawned").listen();
+    gameFolder.add(this.params, "escapedBalls").listen();
+
+    // Technical info folder
+    const techFolder = this.gui.addFolder("Technical Info");
+    techFolder.add(this.params, "rendererType").listen();
+    techFolder.add(this.params, "currentPPM").listen();
+    techFolder.add(this.params, "screenDimensions").listen();
+    techFolder.add(this.params, "ringTargetSize").listen();
+
+    // Responsive scaling controls folder
+    const scalingFolder = this.gui.addFolder("Responsive Scaling");
+    const config = scaleManager.getConfig();
+    scalingFolder.add(config, "targetRingScreenRatio", 0.5, 1.0).step(0.05).name("Ring Screen Ratio").onChange((value: number) => {
+      scaleManager.updateConfig({ targetRingScreenRatio: value });
+      // Trigger recalculation if needed
+      const newPPM = scaleManager.updatePPM(app.screen.width, app.screen.height);
+      this.updateScalingInfo(app);
+    });
+
+    scalingFolder.add(config, "minPPM", 10, 50).step(1).name("Min PPM").onChange((value: number) => {
+      scaleManager.updateConfig({ minPPM: value });
+    });
+
+    scalingFolder.add(config, "maxPPM", 50, 150).step(5).name("Max PPM").onChange((value: number) => {
+      scaleManager.updateConfig({ maxPPM: value });
+    });
+  }
+
+  updateScalingInfo(app: PIXI.Application) {
+    this.params.currentPPM = Math.round(scaleManager.getPPM() * 10) / 10; // Round to 1 decimal
+    this.params.screenDimensions = `${app.screen.width}x${app.screen.height}`;
+
+    const minDimension = Math.min(app.screen.width, app.screen.height);
+    const config = scaleManager.getConfig();
+    const targetSize = Math.round(minDimension * config.targetRingScreenRatio);
+    this.params.ringTargetSize = `${targetSize}px`;
   }
 
   private getRendererType(renderer: PIXI.Renderer): string {

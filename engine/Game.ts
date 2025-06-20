@@ -1,7 +1,7 @@
 import * as PIXI from "pixi.js";
 import type RAPIER from "@dimforge/rapier2d-deterministic";
 import { Ball, Ring, KillBoundary, Prefab, type BallConfig, type RingConfig, type BallSpawnConfig, type KillBoundaryConfig } from "./objects";
-import { m2p } from "./scale";
+import { m2p, scaleManager } from "./scale";
 import { DebugUI } from "./debug/DebugUI";
 import { DebugRenderer } from "./debug/DebugRenderer";
 import { ParticleManager } from "./ParticleManager";
@@ -111,6 +111,7 @@ export class Game {
   totalBallsSpawned: number = 0;
   escapedBallsCount: number = 0;
   private currentColorIndex: number = 0;
+  private resizeHandler!: () => void;
 
   async init(container: HTMLElement) {
     try {
@@ -129,6 +130,9 @@ export class Game {
       });
       container.appendChild(this.app.canvas);
 
+      // Initialize responsive scaling
+      this.initializeResponsiveScaling();
+
       // Log renderer type for debugging
       const gl = (this.app.renderer as any).gl;
       let rendererType = 'Unknown';
@@ -144,6 +148,7 @@ export class Game {
         rendererType = 'Canvas/Other';
       }
       console.log(`PixiJS Renderer: ${rendererType}`);
+      console.log(`Responsive scaling initialized - PPM: ${scaleManager.getPPM()}`);
 
       // Center the stage so (0,0) physics coordinates appear at screen center
       this.app.stage.position.set(this.app.screen.width / 2, this.app.screen.height / 2);
@@ -186,6 +191,109 @@ export class Game {
     } catch (error) {
       console.error("Failed to initialize game:", error);
     }
+  }
+
+  /**
+   * Initialize responsive scaling system and set up resize handling
+   */
+  private initializeResponsiveScaling() {
+    // Calculate optimal scaling for current screen size
+    const screenWidth = this.app.screen.width;
+    const screenHeight = this.app.screen.height;
+
+    // Update the scale manager with current screen dimensions
+    const newPPM = scaleManager.updatePPM(screenWidth, screenHeight);
+
+    console.log(`Screen: ${screenWidth}x${screenHeight}, Ring target: ${Math.round(Math.min(screenWidth, screenHeight) * 0.75)}px, PPM: ${newPPM.toFixed(1)}`);
+
+    // Set up resize handler for responsive behavior
+    this.resizeHandler = () => {
+      this.handleResize();
+    };
+
+    // Listen for window resize events
+    window.addEventListener('resize', this.resizeHandler);
+
+    // Also listen for orientation change on mobile devices
+    window.addEventListener('orientationchange', () => {
+      // Delay handling orientation change to allow UI to settle
+      setTimeout(this.resizeHandler, 100);
+    });
+  }
+
+  /**
+   * Handle window resize events with responsive scaling
+   */
+  private handleResize() {
+    const newScreenWidth = this.app.screen.width;
+    const newScreenHeight = this.app.screen.height;
+
+    // Update scaling
+    const oldPPM = scaleManager.getPPM();
+    const newPPM = scaleManager.updatePPM(newScreenWidth, newScreenHeight);
+
+    // Only update if PPM changed significantly (avoid excessive updates)
+    if (Math.abs(newPPM - oldPPM) > 0.5) {
+      console.log(`Resize detected - New screen: ${newScreenWidth}x${newScreenHeight}, PPM: ${oldPPM.toFixed(1)} → ${newPPM.toFixed(1)}`);
+
+      // Re-center the stage
+      this.app.stage.position.set(newScreenWidth / 2, newScreenHeight / 2);
+
+      // Update kill boundaries with new screen dimensions
+      this.updateKillBoundaries(newScreenWidth, newScreenHeight);
+
+      // Force recreation of graphics for all objects to use new scale
+      this.updateAllGraphicsWithNewScale();
+
+      // Update debug UI with new scaling information
+      this.debugUI.updateScalingInfo(this.app);
+    }
+  }
+
+  /**
+   * Update kill boundaries for new screen dimensions
+   */
+  private updateKillBoundaries(screenWidth: number, screenHeight: number) {
+    if (this.killBoundary) {
+      // Remove old kill boundary
+      const killBoundaryIndex = this.objects.indexOf(this.killBoundary);
+      if (killBoundaryIndex !== -1) {
+        this.app.stage.removeChild(this.killBoundary.graphic);
+        this.objects.splice(killBoundaryIndex, 1);
+      }
+
+      // Create new kill boundary with updated dimensions
+      this.killBoundary = new KillBoundary(
+        this.world,
+        this.R,
+        GAME_CONFIG.killBoundary,
+        screenWidth,
+        screenHeight
+      );
+
+      // Re-setup kill handler
+      this.killBoundary.setKillHandler((killedBall) => {
+        this.handleBallKill(killedBall);
+      });
+
+      this.objects.push(this.killBoundary);
+      this.app.stage.addChild(this.killBoundary.graphic);
+    }
+  }
+
+  /**
+   * Update all graphics with new scale
+   */
+  private updateAllGraphicsWithNewScale() {
+    // Recreate graphics for all objects with new scaling
+    this.objects.forEach(obj => {
+      if (obj.graphic) {
+        this.app.stage.removeChild(obj.graphic);
+        // Force recreation of graphics with new scale
+        (obj as any).createGraphics();
+        this.app.stage.addChild(obj.graphic);
+      }
+    });
   }
 
   private spawnBall(spawnConfig: BallSpawnConfig): Ball {
@@ -349,6 +457,12 @@ export class Game {
   }
 
   destroy() {
+    // Clean up resize handlers
+    if (this.resizeHandler) {
+      window.removeEventListener('resize', this.resizeHandler);
+      window.removeEventListener('orientationchange', this.resizeHandler);
+    }
+
     this.app.destroy(true);
     this.debugUI.destroy();
     this.particleManager.destroy();
