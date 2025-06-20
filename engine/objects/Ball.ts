@@ -34,6 +34,9 @@ export class Ball extends Prefab {
         .setCcdEnabled(true) // CCD enabled by default for all dynamic objects
     );
 
+    // Store ball color in userData for particle system access
+    this.body.userData = { color: this.config.color };
+
     const collider = this.R.ColliderDesc.ball(this.config.radius)
       .setRestitution(this.config.restitution)
       .setFriction(this.config.friction);

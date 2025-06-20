@@ -40,7 +40,8 @@ export interface RingConfig {
   /** Particle effect configuration for ring collisions */
   particles: {
     enabled: boolean;
-    color?: number; // Optional - defaults to ball color
+    color?: number; // Optional - if set, use this color; if not set, use ball color
+    dustIntensity?: number; // Dust particle count multiplier (0.5-2.0)
   };
 }
 

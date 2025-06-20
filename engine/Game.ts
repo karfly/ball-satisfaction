@@ -71,7 +71,8 @@ const GAME_CONFIG = {
     },
     particles: {
       enabled: true,
-      color: 0xFFFFFF // Simple white particles initially
+      color: 0xffffff, // Uncomment to use fixed dust color, comment out to use ball color
+      dustIntensity: 1.0 // Normal dust intensity
     }
   } as RingConfig,
 

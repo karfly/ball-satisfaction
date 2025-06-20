@@ -291,7 +291,20 @@ export class Ring extends Prefab {
 
     // Emit particles at the ball's position (most accurate collision point)
     if (this.config.particles.enabled && this.particleManager) {
-      this.particleManager.emitParticlesAt('ring-collision', actualCollisionX, actualCollisionY);
+      // Get ball velocity for collision information
+      const ballVelocity = collidedBall.linvel();
+      const collisionAngle = Math.atan2(actualCollisionY - ringBodyPos.y, actualCollisionX - ringBodyPos.x);
+      const velocityMagnitude = Math.sqrt(ballVelocity.x * ballVelocity.x + ballVelocity.y * ballVelocity.y);
+      const intensity = Math.min(1.0, velocityMagnitude / 10.0); // Normalize to 0-1 based on velocity
+
+            // Emit dust-fall effect
+      const ballColor = this.config.particles.color || (ballCollider.parent()?.userData as any)?.color;
+      this.particleManager.emitParticlesAt('dust-fall', actualCollisionX, actualCollisionY, {
+        angle: collisionAngle,
+        velocity: ballVelocity,
+        intensity: intensity * (this.config.particles.dustIntensity ?? 1.0),
+        ballColor: ballColor
+      });
     }
 
     // Clean up collision tracking after a short delay to allow re-collision
