@@ -8,6 +8,9 @@ import { ParticleManager } from "./ParticleManager";
 
 // Centralized Game Configuration
 const GAME_CONFIG = {
+  // Debug/Production mode toggle
+  debug: process.env.NODE_ENV === 'development',
+
   physics: {
     gravity: { x: 0, y: 20 },
     fixedDt: 1/120
@@ -105,8 +108,8 @@ export class Game {
   ring!: Ring;
   killBoundary!: KillBoundary;
   R!: typeof RAPIER;
-  debugUI!: DebugUI;
-  debugRenderer!: DebugRenderer;
+  debugUI?: DebugUI;
+  debugRenderer?: DebugRenderer;
   particleManager!: ParticleManager;
   totalBallsSpawned: number = 0;
   escapedBallsCount: number = 0;
@@ -153,8 +156,12 @@ export class Game {
       // Center the stage so (0,0) physics coordinates appear at screen center
       this.app.stage.position.set(this.app.screen.width / 2, this.app.screen.height / 2);
 
-      this.debugUI = new DebugUI(this.world, this.app);
-      this.debugRenderer = new DebugRenderer(this.world, this.app.stage);
+      // Initialize debug tools only in debug mode
+      if (GAME_CONFIG.debug) {
+        this.debugUI = new DebugUI(this.world, this.app);
+        this.debugRenderer = new DebugRenderer(this.world, this.app.stage);
+      }
+
       this.particleManager = new ParticleManager(this.app.stage);
 
       // Create ring arena
@@ -246,7 +253,9 @@ export class Game {
       this.updateAllGraphicsWithNewScale();
 
       // Update debug UI with new scaling information
-      this.debugUI.updateScalingInfo(this.app);
+      if (this.debugUI) {
+        this.debugUI.updateScalingInfo(this.app);
+      }
     }
   }
 
@@ -434,22 +443,22 @@ export class Game {
 
       // Handle graphics visibility
       this.objects.forEach(obj => {
-        obj.graphic.visible = this.debugUI.params["View graphics"];
+        obj.graphic.visible = this.debugUI?.params["View graphics"] ?? true;
       });
 
+      // Handle debug collider rendering (only in debug mode)
+      if (this.debugUI && this.debugRenderer) {
+        if (this.debugUI.params["View colliders"]) {
+          this.debugRenderer.render();
+        } else {
+          this.debugRenderer.layer.clear();
+        }
 
-
-      // Handle debug collider rendering
-      if (this.debugUI.params["View colliders"]) {
-        this.debugRenderer.render();
-      } else {
-        this.debugRenderer.layer.clear();
+        // Update debug info - show ball count instead
+        this.debugUI.params.ballCount = this.balls.length;
+        this.debugUI.params.totalSpawned = this.totalBallsSpawned;
+        this.debugUI.params.escapedBalls = this.escapedBallsCount;
       }
-
-      // Update debug info - show ball count instead
-      this.debugUI.params.ballCount = this.balls.length;
-      this.debugUI.params.totalSpawned = this.totalBallsSpawned;
-      this.debugUI.params.escapedBalls = this.escapedBallsCount;
     });
   }
 
@@ -461,7 +470,9 @@ export class Game {
     }
 
     this.app.destroy(true);
-    this.debugUI.destroy();
+    if (this.debugUI) {
+      this.debugUI.destroy();
+    }
     this.particleManager.destroy();
   }
 }
